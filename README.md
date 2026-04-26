@@ -1,0 +1,392 @@
+# 🎯 PocketCoach AI
+
+**AI-Powered Real-Time Sports Technique Coach**
+
+PocketCoach AI is an intelligent training system that uses device cameras and AI pose detection to provide real-time feedback for **Table Tennis 🏓** and **Boxing 🥊** athletes. Perfect for beginners, intermediate, and advanced athletes looking to improve their technique, reaction time, and overall performance.
+
+---
+
+## 🌟 Features
+
+### 🎥 Real-Time AI Analysis
+- Live pose detection using MediaPipe
+- Instant technique feedback
+- Joint angle calculations
+- Movement tracking and scoring
+
+### 📊 Performance Tracking
+- Technique Accuracy Score (0-100)
+- Reaction Speed Analysis
+- Balance & Stability Metrics
+- Overall Performance Rating
+
+### 🏓 Table Tennis Module
+**Skills Supported:**
+- Forehand Drive
+- Backhand Drive
+- Topspin & Backspin
+- Serve Technique
+- Side Shuffle Footwork
+- Smash
+
+**Analysis Includes:**
+- Shoulder-Elbow-Wrist angles
+- Knee flexion
+- Hip rotation
+- Stance width
+- Swing arc path
+- Weight transfer
+
+### 🥊 Boxing Module
+**Skills Supported:**
+- Jab, Cross, Hook, Uppercut
+- Guard Position
+- Slip & Roll Defense
+- Pivot Footwork
+- Combination Drills
+
+**Analysis Includes:**
+- Punch extension angles
+- Shoulder & hip rotation
+- Guard hand height
+- Foot pivot alignment
+- Balance stability
+- Recovery speed
+
+---
+
+## 🏗️ Architecture
+
+### Backend (FastAPI + Python)
+- **Port:** 8080
+- **Framework:** FastAPI
+- **Database:** SQLite with SQLAlchemy ORM
+- **Authentication:** JWT tokens (7-day expiry)
+- **AI Analysis:** MediaPipe pose detection integration
+
+### Frontend (HTML5/CSS3/JavaScript)
+- **Port:** 3000 (recommended)
+- **Technology:** Vanilla JavaScript, no frameworks
+- **UI Components:** Responsive design with CSS Grid
+- **Real-time Processing:** MediaPipe Pose in browser
+
+---
+
+## 📁 Project Structure
+
+```
+pocket-coach/
+├── backend/
+│   ├── main.py                    # FastAPI application entry point
+│   ├── requirements.txt           # Python dependencies
+│   ├── pocketcoach.db            # SQLite database (auto-generated)
+│   └── app/
+│       ├── database.py           # Database configuration
+│       ├── models/
+│       │   ├── athlete.py        # Athlete model
+│       │   ├── session.py        # Training session model
+│       │   └── skill.py          # Skill library model
+│       ├── routes/
+│       │   ├── auth.py           # Authentication endpoints
+│       │   ├── sessions.py       # Session management
+│       │   ├── skills.py         # Skill library endpoints
+│       │   └── analysis.py       # AI analysis endpoints
+│       └── utils/
+│           └── sports_pose_analyzer.py  # Pose analysis logic
+│
+└── frontend/
+    ├── index.html                # Landing page
+    ├── integration-test.html     # Pose detection test page
+    ├── css/
+    │   └── styles.css            # Global styles
+    ├── js/
+    │   ├── app.js                # Main application logic
+    │   ├── auth.js               # Authentication handling
+    │   ├── session.js            # Live session management
+    │   ├── pose-detection.js     # MediaPipe pose detection
+    │   ├── sports-analyzer.js    # Client-side analysis
+    │   └── profile.js            # Profile management
+    └── pages/
+        ├── login.html            # Login/Signup page
+        ├── dashboard.html        # Athlete dashboard
+        ├── session.html          # Live training session
+        └── profile.html          # Profile management
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Python 3.8 or higher
+- Modern web browser (Chrome, Firefox, Edge)
+- Webcam access
+- Internet connection (for MediaPipe CDN)
+
+### Installation
+
+#### 1. Clone or Download the Project
+```bash
+cd boxing
+```
+
+#### 2. Setup Backend
+
+**Install Python dependencies:**
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+**Run the backend server:**
+```bash
+python main.py
+```
+
+The backend will start on `http://localhost:8080`
+
+**Seed the skills database (first time only):**
+```bash
+curl -X POST http://localhost:8080/api/skills/seed
+```
+
+Or visit: `http://localhost:8080/docs` and use the interactive API docs to call `/api/skills/seed`
+
+#### 3. Setup Frontend
+
+**Using Python's built-in HTTP server:**
+```bash
+cd frontend
+python -m http.server 3000
+```
+
+**Or using Node.js http-server:**
+```bash
+npm install -g http-server
+cd frontend
+http-server -p 3000
+```
+
+**Or using VS Code Live Server:**
+- Install the "Live Server" extension
+- Right-click `index.html` and select "Open with Live Server"
+
+The frontend will be available at `http://localhost:3000`
+
+---
+
+## 📖 Usage Guide
+
+### 1. Create an Account
+- Navigate to `http://localhost:3000`
+- Click "Get Started" or "Login"
+- Fill in the signup form:
+  - Email and username
+  - Password (minimum 6 characters)
+  - Select your sport (Table Tennis or Boxing)
+  - Choose your skill level
+  - Add optional physical stats
+
+### 2. Access Dashboard
+- View your performance overview
+- Check session statistics
+- Browse available skills for your sport
+
+### 3. Start Training Session
+- Click "Start New Training Session"
+- Select session type:
+  - **Drill Practice:** Focused skill training
+  - **Shadow Training:** Solo practice
+  - **Sparring:** Partner practice
+  - **Match Simulation:** Competitive practice
+- Choose a skill to practice
+- Click "Start Training Session"
+
+### 4. Live Training
+- Click "Start Camera" to enable webcam
+- Position yourself so your full body is visible
+- Perform the selected skill
+- Watch real-time feedback on the right panel
+- Monitor your live performance scores
+- View technique tips and common mistakes
+
+### 5. End Session
+- Click "End Session" when done
+- Review your session summary
+- Check overall performance scores
+- View detailed metrics
+
+### 6. Track Progress
+- Visit Dashboard to see:
+  - Total sessions completed
+  - Training minutes logged
+  - Average performance scores
+  - Recent session history
+
+---
+
+## 🗄️ Database Schema
+
+### Athletes Table
+- User authentication and profile
+- Sport type and skill level
+- Physical stats (height, weight)
+- Performance rating
+- Membership tier
+
+### Sessions Table
+- Training session records
+- Performance scores
+- Duration and timing
+- Technique metrics
+- Session data (JSON)
+
+### Skills Table
+- Sport-specific skills
+- Technique tips
+- Common mistakes
+- Safety warnings
+- Difficulty levels
+
+---
+
+## 🔐 API Endpoints
+
+### Authentication
+- `POST /api/auth/signup` - Create new athlete account
+- `POST /api/auth/login` - Login and get JWT token
+- `GET /api/auth/me` - Get current athlete info
+- `POST /api/auth/refresh` - Refresh JWT token
+
+### Sessions
+- `POST /api/sessions/` - Create new session
+- `GET /api/sessions/` - Get athlete's sessions
+- `GET /api/sessions/{id}` - Get specific session
+- `PUT /api/sessions/{id}` - Update session
+- `DELETE /api/sessions/{id}` - Delete session
+- `GET /api/sessions/stats/summary` - Get statistics
+
+### Skills
+- `GET /api/skills/` - Get all skills (filtered by sport)
+- `GET /api/skills/{id}` - Get specific skill
+- `POST /api/skills/` - Create new skill (admin)
+- `POST /api/skills/seed` - Initialize skill library
+
+### Analysis
+- `POST /api/analysis/analyze` - Analyze full session data
+- `POST /api/analysis/realtime-feedback` - Get instant feedback
+
+---
+
+## 🧪 Testing
+
+### Integration Test Page
+Navigate to `http://localhost:3000/integration-test.html`
+
+**Features:**
+- Test camera and pose detection
+- View landmark detection in real-time
+- Monitor FPS and confidence scores
+- Test local analysis algorithms
+- Verify backend API connectivity
+- View joint angles live
+- Test different sports and skills
+
+---
+
+## 🎨 Customization
+
+### Adding New Skills
+Use the FastAPI docs at `http://localhost:8080/docs`:
+1. Navigate to `/api/skills/` POST endpoint
+2. Provide skill details:
+   - name
+   - sport_type
+   - description
+   - technique_tips
+   - common_mistakes
+   - difficulty_level
+
+### Modifying Analysis Logic
+Edit `backend/app/utils/sports_pose_analyzer.py`:
+- Adjust angle thresholds
+- Add new joint checks
+- Customize feedback messages
+- Implement sport-specific rules
+
+---
+
+## 🐛 Troubleshooting
+
+### Backend won't start
+- Check Python version: `python --version`
+- Ensure all dependencies installed: `pip install -r requirements.txt`
+- Check if port 8080 is available
+
+### Camera not working
+- Grant camera permissions in browser
+- Check if other apps are using camera
+- Try a different browser
+- Ensure HTTPS or localhost (required for camera access)
+
+### Frontend can't connect to backend
+- Verify backend is running on port 8080
+- Check browser console for CORS errors
+- Ensure API_URL is correct in JS files
+
+### Pose detection not working
+- Check internet connection (MediaPipe loads from CDN)
+- Ensure good lighting conditions
+- Position full body in camera frame
+- Try clearing browser cache
+
+---
+
+## 🔮 Future Enhancements
+
+### High Priority
+- [ ] Video recording and playback
+- [ ] Slow-motion replay
+- [ ] Ball tracking (Table Tennis)
+- [ ] Punch speed estimation (Boxing)
+- [ ] ML-based technique scoring
+- [ ] Session replay system
+- [ ] Advanced analytics dashboard
+
+### Additional Features
+- [ ] Multi-athlete comparison
+- [ ] Coach mode with remote viewing
+- [ ] Training programs and plans
+- [ ] Social features and leaderboards
+- [ ] Mobile app versions
+- [ ] Virtual sparring partner
+- [ ] AR overlay improvements
+
+---
+
+## 📄 License
+
+This project is provided as-is for educational and training purposes.
+
+---
+
+## 👥 Support
+
+For issues, questions, or contributions:
+- Check the integration test page first
+- Review API documentation at `/docs`
+- Ensure all dependencies are installed
+- Verify camera permissions
+
+---
+
+## 🎯 Project Identity
+
+**PocketCoach AI**
+*Empowering athletes with intelligent, real-time technique coaching*
+
+Focused on **Table Tennis** and **Boxing** performance optimization using cutting-edge AI technology.
+
+---
+
+**Built with ❤️ for athletes who want to train smarter, not just harder.**

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - PocketCoach AI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="navbar-brand">🎯 PocketCoach AI</a>
+            <ul class="navbar-nav">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li id="adminLink" style="display: none;"><a href="admin.html">Coach Analytics</a></li>
+                <li><a href="session.html">Start Session</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-danger">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="padding: 2rem;">
+        <!-- Welcome Section -->
+        <div class="card">
+            <h1>Welcome back, <span id="athleteName">Athlete</span>! 👋</h1>
+            <p>Ready to improve your <strong id="athleteSport">sport</strong> skills?</p>
+            <a href="session.html" class="btn btn-primary btn-large">Start New Training Session</a>
+        </div>
+
+        <!-- Performance Stats -->
+        <h2 class="mt-4 mb-3">Your Performance Overview</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-value" id="totalSessions">0</span>
+                <span class="stat-label">Total Sessions</span>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, var(--secondary-color), #059669);">
+                <span class="stat-value" id="totalMinutes">0</span>
+                <span class="stat-label">Training Minutes</span>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, var(--boxing-color), #7c3aed);">
+                <span class="stat-value" id="avgPerformance">0</span>
+                <span class="stat-label">Avg Performance</span>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, var(--table-tennis-color), #ff5722);">
+                <span class="stat-value" id="avgTechnique">0</span>
+                <span class="stat-label">Avg Technique</span>
+            </div>
+        </div>
+
+        <!-- Detailed Metrics -->
+        <div class="grid grid-2 mt-4">
+            <div class="card">
+                <h3 class="card-header">Reaction Score</h3>
+                <div class="score-display" id="reactionScore">0</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="reactionProgress" style="width: 0%">0%</div>
+                </div>
+            </div>
+            <div class="card">
+                <h3 class="card-header">Balance Score</h3>
+                <div class="score-display" id="balanceScore">0</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="balanceProgress" style="width: 0%">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Sessions -->
+        <h2 class="mt-4 mb-3">Recent Training Sessions</h2>
+        <div id="recentSessions">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- Available Skills -->
+        <h2 class="mt-4 mb-3">Available Skills for Your Sport</h2>
+        <div id="availableSkills" class="grid grid-3">
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8080';
+        
+        // Check authentication
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = 'login.html';
+        }
+
+        // Logout functionality
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('athlete');
+            window.location.href = 'login.html';
+        });
+
+        // Load dashboard data
+        async function loadDashboard() {
+            try {
+                const athlete = JSON.parse(localStorage.getItem('athlete'));
+                
+                // Show admin link for coaches
+                if (athlete && athlete.role === 'coach') {
+                    const adminLink = document.getElementById('adminLink');
+                    if (adminLink) {
+                        adminLink.style.display = 'block';
+                        console.log('✅ Admin link shown for coach');
+                    }
+                }
+                
+                // Display athlete info
+                if (!athlete) {
+                    window.location.href = 'login.html';
+                    return;
+                }
+                
+                document.getElementById('athleteName').textContent = athlete.username;
+                const sportDisplay = athlete.sport_type === 'table_tennis' ? '🏓 Table Tennis' : '🥊 Boxing';
+                document.getElementById('athleteSport').textContent = sportDisplay;
+
+                // Load session stats
+                const statsResponse = await fetch(`${API_URL}/api/sessions/stats/summary`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const stats = await statsResponse.json();
+
+                // Update stats
+                document.getElementById('totalSessions').textContent = stats.total_sessions;
+                document.getElementById('totalMinutes').textContent = stats.total_minutes;
+                document.getElementById('avgPerformance').textContent = stats.average_performance;
+                document.getElementById('avgTechnique').textContent = stats.average_technique;
+                document.getElementById('reactionScore').textContent = stats.average_reaction;
+                document.getElementById('balanceScore').textContent = stats.average_balance;
+
+                // Update progress bars
+                document.getElementById('reactionProgress').style.width = `${stats.average_reaction}%`;
+                document.getElementById('reactionProgress').textContent = `${stats.average_reaction}%`;
+                document.getElementById('balanceProgress').style.width = `${stats.average_balance}%`;
+                document.getElementById('balanceProgress').textContent = `${stats.average_balance}%`;
+
+                // Apply score colors
+                applyScoreColor('avgPerformance', stats.average_performance);
+                applyScoreColor('reactionScore', stats.average_reaction);
+                applyScoreColor('balanceScore', stats.average_balance);
+
+                // Load recent sessions
+                await loadRecentSessions();
+
+                // Load available skills
+                await loadAvailableSkills(athlete.sport_type);
+
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        async function loadRecentSessions() {
+            try {
+                const response = await fetch(`${API_URL}/api/sessions/?limit=5`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const sessions = await response.json();
+
+                const container = document.getElementById('recentSessions');
+                
+                if (sessions.length === 0) {
+                    container.innerHTML = '<div class="card"><p>No sessions yet. Start your first training session!</p></div>';
+                    return;
+                }
+
+                container.innerHTML = sessions.map(session => `
+                    <div class="card">
+                        <div class="flex justify-between align-center">
+                            <div>
+                                <h4>${session.sport_type === 'table_tennis' ? '🏓' : '🥊'} ${session.session_type.replace('_', ' ').toUpperCase()}</h4>
+                                <p style="color: var(--text-secondary);">${new Date(session.start_time).toLocaleDateString()} - ${session.duration_minutes} min</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="score-display ${getScoreClass(session.performance_score)}" style="font-size: 2rem;">
+                                    ${session.performance_score}
+                                </div>
+                                <p style="font-size: 0.875rem; color: var(--text-secondary);">Performance</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-3 gap-2 mt-2">
+                            <div>
+                                <strong>Technique:</strong> ${session.technique_accuracy}
+                            </div>
+                            <div>
+                                <strong>Reaction:</strong> ${session.reaction_score}
+                            </div>
+                            <div>
+                                <strong>Balance:</strong> ${session.balance_score}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+                document.getElementById('recentSessions').innerHTML = 
+                    '<div class="alert alert-error">Failed to load sessions</div>';
+            }
+        }
+
+        async function loadAvailableSkills(sportType) {
+            try {
+                const response = await fetch(`${API_URL}/api/skills/?sport_type=${sportType}`);
+                const skills = await response.json();
+
+                const container = document.getElementById('availableSkills');
+                
+                container.innerHTML = skills.map(skill => `
+                    <div class="card">
+                        <h4>${skill.name}</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.875rem;">${skill.description || 'No description'}</p>
+                        <div class="mt-2">
+                            <span style="background-color: var(--light-bg); padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem;">
+                                ${skill.difficulty_level}
+                            </span>
+                            ${skill.primary_focus ? `
+                                <span style="background-color: var(--light-bg); padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; margin-left: 0.5rem;">
+                                    ${skill.primary_focus}
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error('Error loading skills:', error);
+            }
+        }
+
+        function applyScoreColor(elementId, score) {
+            const element = document.getElementById(elementId);
+            element.className = 'score-display ' + getScoreClass(score);
+        }
+
+        function getScoreClass(score) {
+            if (score >= 90) return 'excellent';
+            if (score >= 75) return 'good';
+            if (score >= 60) return 'average';
+            return 'poor';
+        }
+
+        // Load dashboard on page load
+        loadDashboard();
+    </script>
+</body>
+</html>

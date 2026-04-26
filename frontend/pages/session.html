@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Session - PocketCoach AI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="navbar-brand">🎯 PocketCoach AI</a>
+            <ul class="navbar-nav">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="session.html">Start Session</a></li>
+                <li id="adminLink" style="display: none;"><a href="admin.html">Admin</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-danger">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="padding: 2rem;">
+        <!-- Session Setup -->
+        <div id="sessionSetup" class="card" style="max-width: 600px; margin: 0 auto;">
+            <h2 class="card-header">Setup Your Training Session</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                After you press Start Training Session, you will be redirected to the live camera page.
+            </p>
+            <form id="sessionSetupForm">
+                <div class="form-group">
+                    <label class="form-label" for="sessionType">Session Type</label>
+                    <select id="sessionType" class="form-select" required>
+                        <option value="">Select session type...</option>
+                        <option value="drill">Drill Practice</option>
+                        <option value="shadow">Shadow Training</option>
+                        <option value="sparring">Sparring</option>
+                        <option value="match_simulation">Match Simulation</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="skillSelect">Skill to Practice</label>
+                    <select id="skillSelect" class="form-select" required>
+                        <option value="">Loading skills...</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-large" style="width: 100%;">Start Training Session</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Show admin link for coaches
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const athleteData = localStorage.getItem('athlete');
+                if (!athleteData) {
+                    console.log('No athlete data in localStorage');
+                    return;
+                }
+                
+                const athlete = JSON.parse(athleteData);
+                console.log('Athlete data:', athlete);
+                console.log('Role:', athlete.role);
+                
+                const adminLink = document.getElementById('adminLink');
+                if (adminLink && athlete.role === 'coach') {
+                    adminLink.style.display = 'block';
+                    console.log('Admin link shown');
+                } else if (!adminLink) {
+                    console.log('Admin link element not found');
+                }
+            } catch (e) {
+                console.error('Error showing admin link:', e);
+            }
+        });
+    </script>
+    <script src="../js/session.js"></script>
+</body>
+</html>

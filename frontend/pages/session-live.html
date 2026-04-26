@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Training Session - PocketCoach AI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="navbar-brand">🎯 PocketCoach AI</a>
+            <ul class="navbar-nav">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="session.html">Start Session</a></li>
+                <li id="adminLink" style="display: none;"><a href="admin.html">Admin</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-danger">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="padding: 2rem;">
+        <div id="trainingInterface">
+            <div class="card mb-3">
+                <div class="flex justify-between align-center">
+                    <div>
+                        <h3 id="currentSkill">Skill Name</h3>
+                        <p style="color: var(--text-secondary); margin: 0;">
+                            Session Type: <strong id="currentSessionType">-</strong> |
+                            Duration: <strong id="sessionDuration">00:00</strong>
+                        </p>
+                    </div>
+                    <button id="endSessionBtn" class="btn btn-danger">End Session</button>
+                </div>
+            </div>
+
+            <div class="grid grid-2 gap-3">
+                <div>
+                    <div class="video-container">
+                        <video id="webcam" autoplay playsinline muted></video>
+                        <canvas id="poseCanvas" class="video-canvas"></canvas>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="flex justify-between align-center">
+                            <button id="startCameraBtn" class="btn btn-primary">Start Camera</button>
+                            <button id="stopCameraBtn" class="btn btn-secondary hidden">Stop Camera</button>
+                            <button id="endSessionBtnSecondary" class="btn btn-danger">End Session</button>
+                            <div>
+                                <span style="font-weight: 500;">FPS: </span>
+                                <span id="fpsDisplay">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <p id="cameraStatus" style="margin: 0; color: var(--text-secondary);">Camera not started.</p>
+                    </div>
+
+                    <div class="card mt-3">
+                        <h4 class="text-center">Current Performance</h4>
+                        <div class="score-display excellent" id="liveScore">0</div>
+                        <div class="grid grid-3 gap-2 text-center mt-3">
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: bold;" id="liveTechnique">0</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);">Technique</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: bold;" id="liveReaction">0</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);">Reaction</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 1.5rem; font-weight: bold;" id="liveBalance">0</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);">Balance</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="card" style="height: fit-content;">
+                        <h4>Technique Tips</h4>
+                        <div id="techniqueTips" style="background-color: var(--light-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                            <p style="margin: 0;">Loading technique guidance...</p>
+                        </div>
+
+                        <h4>Live Feedback</h4>
+                        <div id="feedbackPanel" style="max-height: 400px; overflow-y: auto;">
+                            <p style="color: var(--text-secondary);">Pose detection is starting...</p>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <h4>Skill Details</h4>
+                        <div id="skillDetails">
+                            <p><strong>Common Mistakes:</strong></p>
+                            <p id="commonMistakes" style="color: var(--text-secondary);">-</p>
+                            <p class="mt-2"><strong>Safety Warning:</strong></p>
+                            <p id="safetyWarning" style="color: var(--danger-color);">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="sessionSummary" class="session-summary-overlay hidden">
+            <div class="card" style="max-width: 600px; width: 90%;">
+                <h2 class="card-header">Session Complete! 🎉</h2>
+                <div class="card-body">
+                    <div class="score-display excellent" id="summaryScore">0</div>
+                    <h4 class="text-center mb-3">Overall Performance</h4>
+
+                    <div class="grid grid-3 gap-2 mb-3">
+                        <div class="text-center">
+                            <div style="font-size: 2rem; font-weight: bold;" id="summaryTechnique">0</div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">Technique</div>
+                        </div>
+                        <div class="text-center">
+                            <div style="font-size: 2rem; font-weight: bold;" id="summaryReaction">0</div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">Reaction</div>
+                        </div>
+                        <div class="text-center">
+                            <div style="font-size: 2rem; font-weight: bold;" id="summaryBalance">0</div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">Balance</div>
+                        </div>
+                    </div>
+
+                    <p class="text-center" style="color: var(--text-secondary);">
+                        Duration: <strong id="summaryDuration">0</strong> minutes
+                    </p>
+
+                    <div class="flex gap-2 mt-4">
+                        <a href="dashboard.html" class="btn btn-primary" style="flex: 1; text-align: center;">View Dashboard</a>
+                        <button id="startNewSessionBtn" class="btn btn-secondary" style="flex: 1;">Start New Session</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Show admin link for coaches
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const athleteData = localStorage.getItem('athlete');
+                if (!athleteData) {
+                    console.log('No athlete data in localStorage');
+                    return;
+                }
+                
+                const athlete = JSON.parse(athleteData);
+                console.log('Athlete data:', athlete);
+                console.log('Role:', athlete.role);
+                
+                const adminLink = document.getElementById('adminLink');
+                if (adminLink && athlete.role === 'coach') {
+                    adminLink.style.display = 'block';
+                    console.log('Admin link shown');
+                } else if (!adminLink) {
+                    console.log('Admin link element not found');
+                }
+            } catch (e) {
+                console.error('Error showing admin link:', e);
+            }
+        });
+    </script>
+    <script src="../js/pose-detection.js"></script>
+    <script src="../js/sports-analyzer.js"></script>
+    <script src="../js/session-live.js"></script>
+</body>
+</html>

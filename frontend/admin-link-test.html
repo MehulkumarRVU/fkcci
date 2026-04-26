@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Link Test</title>
+</head>
+<body>
+    <h1>Admin Link Visibility Test</h1>
+    
+    <div id="status" style="padding: 20px; border: 1px solid #ccc; margin: 20px 0;">
+        <h3>Testing Admin Link Detection:</h3>
+        <pre id="test-output" style="background: #f0f0f0; padding: 10px;"></pre>
+    </div>
+
+    <script>
+        // Simulate coach login
+        const coachData = {
+            id: 1,
+            username: "testcoach",
+            email: "coach@example.com",
+            role: "coach",
+            sport_type: "boxing",
+            linked_sports: ["boxing", "table_tennis"]
+        };
+
+        // Store in localStorage
+        localStorage.setItem('athlete', JSON.stringify(coachData));
+
+        let output = '';
+        output += '✓ Coach data stored in localStorage\n';
+        output += `  Username: ${coachData.username}\n`;
+        output += `  Role: ${coachData.role}\n\n`;
+
+        // Test the admin link detection logic
+        try {
+            const athleteData = localStorage.getItem('athlete');
+            if (!athleteData) {
+                output += '❌ ERROR: No athlete data in localStorage\n';
+            } else {
+                output += '✓ Athlete data found\n';
+                
+                const athlete = JSON.parse(athleteData);
+                output += `  Parsed role: ${athlete.role}\n`;
+                
+                if (athlete.role === 'coach') {
+                    output += '✓ Role check PASSED: User is a coach\n';
+                    output += '  → Admin link SHOULD be visible\n';
+                } else {
+                    output += `❌ Role check FAILED: Expected 'coach', got '${athlete.role}'\n`;
+                }
+            }
+        } catch (e) {
+            output += `❌ ERROR: ${e.message}\n`;
+        }
+
+        document.getElementById('test-output').textContent = output;
+
+        // Also test with athlete role
+        console.log('\n=== Test 1: Coach Role ===');
+        console.log(output);
+
+        // Test 2: Athlete role
+        output = '';
+        const athleteData = {
+            id: 2,
+            username: "testathlete",
+            email: "athlete@example.com",
+            role: "athlete",
+            sport_type: "boxing",
+            linked_sports: ["boxing"]
+        };
+
+        localStorage.setItem('athlete', JSON.stringify(athleteData));
+        
+        output += '=== Test 2: Athlete Role ===\n';
+        output += '✓ Athlete data stored in localStorage\n';
+        output += `  Username: ${athleteData.username}\n`;
+        output += `  Role: ${athleteData.role}\n\n`;
+
+        try {
+            const athleteData2 = localStorage.getItem('athlete');
+            const athlete2 = JSON.parse(athleteData2);
+            output += `  Parsed role: ${athlete2.role}\n`;
+            
+            if (athlete2.role === 'coach') {
+                output += '❌ Role check: User is NOT a coach\n';
+                output += '  → Admin link SHOULD NOT be visible\n';
+            } else {
+                output += `✓ Role check PASSED: User is an athlete\n`;
+                output += '  → Admin link SHOULD NOT be visible\n';
+            }
+        } catch (e) {
+            output += `❌ ERROR: ${e.message}\n`;
+        }
+
+        console.log(output);
+    </script>
+
+    <h2>Instructions to Test on Live App:</h2>
+    <ol>
+        <li>Open browser DevTools (F12)</li>
+        <li>Go to the Console tab</li>
+        <li>Login as testcoach / secret123</li>
+        <li>Navigate to any page (dashboard, profile, session, etc.)</li>
+        <li>In console, paste: <code>JSON.parse(localStorage.getItem('athlete')).role</code></li>
+        <li>You should see: <code>"coach"</code></li>
+        <li>Look at navbar - "Admin" link should be visible</li>
+    </ol>
+</body>
+</html>

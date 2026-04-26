@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - PocketCoach AI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="navbar-brand">🎯 PocketCoach AI</a>
+            <ul class="navbar-nav">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="session.html">Start Session</a></li>
+                <li id="adminLink" style="display: none;"><a href="admin.html">Admin</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-danger">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="padding: 2rem; max-width: 800px;">
+        <h1 class="mb-4">Your Profile</h1>
+
+        <!-- Alert Container -->
+        <div id="alertContainer"></div>
+
+        <!-- Profile Information -->
+        <div class="card">
+            <h3 class="card-header">Account Information</h3>
+            <div class="card-body">
+                <div class="grid grid-2 gap-3">
+                    <div>
+                        <strong>Username:</strong>
+                        <p id="profileUsername">-</p>
+                    </div>
+                    <div>
+                        <strong>Email:</strong>
+                        <p id="profileEmail">-</p>
+                    </div>
+                    <div>
+                        <strong>Active Sport:</strong>
+                        <p id="profileSport">-</p>
+                    </div>
+                    <div>
+                        <strong>Connected Sports:</strong>
+                        <p id="profileLinkedSports">-</p>
+                    </div>
+                    <div>
+                        <strong>Skill Level:</strong>
+                        <p id="profileSkillLevel">-</p>
+                    </div>
+                    <div>
+                        <strong>Dominant Hand:</strong>
+                        <p id="profileDominantHand">-</p>
+                    </div>
+                    <div>
+                        <strong>Membership:</strong>
+                        <p id="profileMembership">-</p>
+                    </div>
+                    <div>
+                        <strong>Member Since:</strong>
+                        <p id="profileCreatedAt">-</p>
+                    </div>
+                    <div>
+                        <strong>Performance Rating:</strong>
+                        <p id="profilePerformance" class="score-display" style="font-size: 1.5rem; margin: 0;">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Physical Stats -->
+        <div class="card mt-4">
+            <h3 class="card-header">Physical Stats</h3>
+            <form id="updatePhysicalForm">
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label class="form-label" for="updateHeight">Height (cm)</label>
+                        <input type="number" id="updateHeight" class="form-input" min="100" max="250">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="updateWeight">Weight (kg)</label>
+                        <input type="number" id="updateWeight" class="form-input" min="30" max="200">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="updateTrainingFrequency">Training Frequency (per week)</label>
+                    <input type="number" id="updateTrainingFrequency" class="form-input" min="0" max="14">
+                </div>
+                <button type="submit" class="btn btn-primary">Update Physical Stats</button>
+            </form>
+        </div>
+
+        <!-- Training Preferences -->
+        <div class="card mt-4">
+            <h3 class="card-header">Training Preferences</h3>
+            <form id="updatePreferencesForm">
+                <div class="form-group">
+                    <label class="form-label">Connected Sports</label>
+                    <div class="flex gap-2">
+                        <label><input type="checkbox" id="linkBoxing" value="boxing"> 🥊 Boxing</label>
+                        <label><input type="checkbox" id="linkTableTennis" value="table_tennis"> 🏓 Table Tennis</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="updateActiveSport">Active Sport</label>
+                    <select id="updateActiveSport" class="form-select">
+                        <option value="boxing">🥊 Boxing</option>
+                        <option value="table_tennis">🏓 Table Tennis</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="updateSkillLevel">Skill Level</label>
+                    <select id="updateSkillLevel" class="form-select">
+                        <option value="beginner">Beginner</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="advanced">Advanced</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="updateDominantHand">Dominant Hand</label>
+                    <select id="updateDominantHand" class="form-select">
+                        <option value="right">Right</option>
+                        <option value="left">Left</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Update Preferences</button>
+            </form>
+        </div>
+
+        <!-- Training Statistics -->
+        <div class="card mt-4">
+            <h3 class="card-header">Training Statistics</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-value" id="statTotalSessions">0</span>
+                    <span class="stat-label">Total Sessions</span>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, var(--secondary-color), #059669);">
+                    <span class="stat-value" id="statAvgPerformance">0</span>
+                    <span class="stat-label">Avg Performance</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Show admin link for coaches
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                const athleteData = localStorage.getItem('athlete');
+                if (!athleteData) {
+                    console.log('No athlete data in localStorage');
+                    return;
+                }
+                
+                const athlete = JSON.parse(athleteData);
+                console.log('Athlete data:', athlete);
+                console.log('Role:', athlete.role);
+                
+                const adminLink = document.getElementById('adminLink');
+                if (adminLink && athlete.role === 'coach') {
+                    adminLink.style.display = 'block';
+                    console.log('Admin link shown');
+                } else if (!adminLink) {
+                    console.log('Admin link element not found');
+                }
+            } catch (e) {
+                console.error('Error showing admin link:', e);
+            }
+        });
+    </script>
+    <script src="../js/profile.js"></script>
+</body>
+</html>

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pose Detection Test - PocketCoach AI</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="navbar-brand">🎯 PocketCoach AI</a>
+            <ul class="navbar-nav">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="pages/login.html">Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="padding: 2rem;">
+        <h1 class="text-center mb-4">Pose Detection Integration Test</h1>
+        <p class="text-center mb-4" style="color: var(--text-secondary);">
+            Test MediaPipe Pose detection and real-time analysis
+        </p>
+
+        <div class="grid grid-2 gap-3">
+            <!-- Video Feed -->
+            <div>
+                <div class="card">
+                    <h3>Camera Feed</h3>
+                    <div class="video-container">
+                        <video id="webcam" autoplay playsinline></video>
+                        <canvas id="poseCanvas" class="video-canvas"></canvas>
+                    </div>
+                    <div class="mt-3 flex justify-between align-center">
+                        <button id="startBtn" class="btn btn-primary">Start Camera</button>
+                        <button id="stopBtn" class="btn btn-danger hidden">Stop Camera</button>
+                        <div>
+                            <strong>FPS:</strong> <span id="fps">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sport Selection -->
+                <div class="card mt-3">
+                    <h3>Test Configuration</h3>
+                    <div class="form-group">
+                        <label class="form-label">Sport Type</label>
+                        <select id="sportType" class="form-select">
+                            <option value="table_tennis">🏓 Table Tennis</option>
+                            <option value="boxing">🥊 Boxing</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Skill</label>
+                        <input type="text" id="skillName" class="form-input" value="Jab" placeholder="Enter skill name">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Output -->
+            <div>
+                <div class="card">
+                    <h3>Landmark Detection</h3>
+                    <div id="landmarkStatus" class="alert alert-info">
+                        Waiting for camera...
+                    </div>
+                    <div class="grid grid-3 gap-2 mt-3">
+                        <div class="text-center">
+                            <div id="visibleCount" style="font-size: 2rem; font-weight: bold;">0</div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">Visible Landmarks</div>
+                        </div>
+                        <div class="text-center">
+                            <div id="totalCount" style="font-size: 2rem; font-weight: bold;">33</div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">Total Landmarks</div>
+                        </div>
+                        <div class="text-center">
+                            <div id="confidence" style="font-size: 2rem; font-weight: bold;">0%</div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">Confidence</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <h3>Local Analysis Results</h3>
+                    <div class="score-display excellent" id="testScore">0</div>
+                    <div id="testFeedback" style="margin-top: 1rem;">
+                        <p style="color: var(--text-secondary);">Start camera to see feedback...</p>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <h3>Key Angles</h3>
+                    <div id="angleDisplay" style="font-family: monospace; font-size: 0.875rem;">
+                        <p>Left Elbow: <span id="leftElbow">-</span>°</p>
+                        <p>Right Elbow: <span id="rightElbow">-</span>°</p>
+                        <p>Left Knee: <span id="leftKnee">-</span>°</p>
+                        <p>Right Knee: <span id="rightKnee">-</span>°</p>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <h3>Backend API Test</h3>
+                    <button id="testApiBtn" class="btn btn-secondary" style="width: 100%;">
+                        Test Backend Analysis
+                    </button>
+                    <div id="apiResult" class="mt-2" style="font-size: 0.875rem; color: var(--text-secondary);">
+                        Click button to test backend API
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/pose-detection.js"></script>
+    <script src="js/sports-analyzer.js"></script>
+    <script>
+        let detector = null;
+        let analyzer = null;
+        let lastLandmarks = null;
+
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const sportTypeSelect = document.getElementById('sportType');
+        const skillNameInput = document.getElementById('skillName');
+
+        startBtn.addEventListener('click', async () => {
+            detector = new PoseDetector();
+            analyzer = new SportsAnalyzer(sportTypeSelect.value);
+
+            await detector.initialize(
+                document.getElementById('webcam'),
+                document.getElementById('poseCanvas')
+            );
+
+            const success = await detector.startCamera();
+            
+            if (success) {
+                startBtn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+
+                detector.setOnResultsCallback(onPoseResults);
+
+                // Update FPS display
+                setInterval(() => {
+                    document.getElementById('fps').textContent = detector.getFPS();
+                }, 1000);
+
+                document.getElementById('landmarkStatus').textContent = 'Camera active - detecting pose...';
+                document.getElementById('landmarkStatus').className = 'alert alert-success';
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (detector) {
+                detector.stopCamera();
+                startBtn.classList.remove('hidden');
+                stopBtn.classList.add('hidden');
+                document.getElementById('landmarkStatus').textContent = 'Camera stopped';
+                document.getElementById('landmarkStatus').className = 'alert alert-info';
+            }
+        });
+
+        // Update analyzer when sport type changes
+        sportTypeSelect.addEventListener('change', () => {
+            if (analyzer) {
+                analyzer = new SportsAnalyzer(sportTypeSelect.value);
+            }
+        });
+
+        function onPoseResults(landmarks) {
+            lastLandmarks = landmarks;
+
+            // Count visible landmarks
+            const visibleLandmarks = landmarks.filter(lm => lm.visibility > 0.5);
+            document.getElementById('visibleCount').textContent = visibleLandmarks.length;
+
+            // Calculate average confidence
+            const avgConfidence = landmarks.reduce((sum, lm) => sum + lm.visibility, 0) / landmarks.length;
+            document.getElementById('confidence').textContent = Math.round(avgConfidence * 100) + '%';
+
+            // Calculate key angles
+            calculateAndDisplayAngles(landmarks);
+
+            // Run local analysis
+            const analysis = analyzer.analyzeLocally(landmarks, skillNameInput.value);
+            
+            // Display score
+            const scoreElement = document.getElementById('testScore');
+            scoreElement.textContent = Math.round(analysis.score);
+            scoreElement.className = 'score-display ' + getScoreClass(analysis.score);
+
+            // Display feedback
+            document.getElementById('testFeedback').innerHTML = analyzer.formatFeedback(analysis.feedback);
+        }
+
+        function calculateAndDisplayAngles(landmarks) {
+            // Left elbow angle (shoulder-elbow-wrist)
+            const leftShoulder = landmarks[11];
+            const leftElbow = landmarks[13];
+            const leftWrist = landmarks[15];
+            
+            if (leftShoulder && leftElbow && leftWrist) {
+                const leftElbowAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
+                document.getElementById('leftElbow').textContent = Math.round(leftElbowAngle);
+            }
+
+            // Right elbow angle
+            const rightShoulder = landmarks[12];
+            const rightElbow = landmarks[14];
+            const rightWrist = landmarks[16];
+            
+            if (rightShoulder && rightElbow && rightWrist) {
+                const rightElbowAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+                document.getElementById('rightElbow').textContent = Math.round(rightElbowAngle);
+            }
+
+            // Left knee angle (hip-knee-ankle)
+            const leftHip = landmarks[23];
+            const leftKnee = landmarks[25];
+            const leftAnkle = landmarks[27];
+            
+            if (leftHip && leftKnee && leftAnkle) {
+                const leftKneeAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
+                document.getElementById('leftKnee').textContent = Math.round(leftKneeAngle);
+            }
+
+            // Right knee angle
+            const rightHip = landmarks[24];
+            const rightKnee = landmarks[26];
+            const rightAnkle = landmarks[28];
+            
+            if (rightHip && rightKnee && rightAnkle) {
+                const rightKneeAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
+                document.getElementById('rightKnee').textContent = Math.round(rightKneeAngle);
+            }
+        }
+
+        function calculateAngle(a, b, c) {
+            const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+            let angle = Math.abs(radians * 180.0 / Math.PI);
+            if (angle > 180.0) {
+                angle = 360 - angle;
+            }
+            return angle;
+        }
+
+        function getScoreClass(score) {
+            if (score >= 90) return 'excellent';
+            if (score >= 75) return 'good';
+            if (score >= 60) return 'average';
+            return 'poor';
+        }
+
+        // Test backend API
+        document.getElementById('testApiBtn').addEventListener('click', async () => {
+            if (!lastLandmarks) {
+                document.getElementById('apiResult').textContent = 'No pose data available. Start camera first.';
+                return;
+            }
+
+            document.getElementById('apiResult').textContent = 'Testing backend API...';
+
+            try {
+                const landmarksArray = lastLandmarks.map(lm => ({
+                    x: lm.x,
+                    y: lm.y,
+                    z: lm.z,
+                    visibility: lm.visibility
+                }));
+
+                const response = await fetch('http://localhost:8080/api/analysis/realtime-feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sport_type: sportTypeSelect.value,
+                        skill_name: skillNameInput.value,
+                        landmarks: landmarksArray
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    document.getElementById('apiResult').innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>Backend API Response:</strong><br>
+                            Score: ${result.score}<br>
+                            Technique: ${result.technique_accuracy}<br>
+                            Feedback: ${result.feedback?.join(', ') || 'None'}
+                        </div>
+                    `;
+                } else {
+                    const error = await response.json();
+                    document.getElementById('apiResult').innerHTML = `
+                        <div class="alert alert-error">
+                            API Error: ${error.detail || 'Unknown error'}
+                        </div>
+                    `;
+                }
+
+            } catch (error) {
+                document.getElementById('apiResult').innerHTML = `
+                    <div class="alert alert-error">
+                        Connection Error: ${error.message}<br>
+                        Make sure backend is running on port 8080
+                    </div>
+                `;
+            }
+        });
+
+        console.log('Integration test page loaded');
+    </script>
+</body>
+</html>

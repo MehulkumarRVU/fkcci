@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - PocketCoach AI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="../index.html" class="navbar-brand">🎯 PocketCoach AI</a>
+            <ul class="navbar-nav">
+                <li><a href="../index.html">Home</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Login/Signup Container -->
+    <div class="container" style="max-width: 500px; margin-top: 4rem; margin-bottom: 4rem;">
+        <!-- Alert Messages -->
+        <div id="alertContainer"></div>
+
+        <!-- Login Form -->
+        <div id="loginForm" class="card">
+            <h2 class="card-header">Login to Your Account</h2>
+            <form id="loginFormElement">
+                <div class="form-group">
+                    <label class="form-label" for="loginUsername">Username</label>
+                    <input type="text" id="loginUsername" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" class="form-input" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+            </form>
+            <p class="text-center mt-3">
+                Don't have an account? 
+                <a href="#" id="showSignupLink" style="color: var(--primary-color); font-weight: 500;">Sign Up</a>
+            </p>
+        </div>
+
+        <!-- Signup Form -->
+        <div id="signupForm" class="card hidden">
+            <h2 class="card-header">Create Your Account</h2>
+            <form id="signupFormElement">
+                <div class="form-group">
+                    <label class="form-label" for="accountType">Account Type</label>
+                    <select id="accountType" class="form-select" required>
+                        <option value="athlete">🏃 Athlete</option>
+                        <option value="coach">🏋️ Coach</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="signupEmail">Email</label>
+                    <input type="email" id="signupEmail" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="signupUsername">Username</label>
+                    <input type="text" id="signupUsername" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" class="form-input" required minlength="6">
+                </div>
+                <div id="athleteFields">
+                    <div class="form-group">
+                        <label class="form-label" for="sportType">Select Your Sport</label>
+                        <select id="sportType" class="form-select" required>
+                            <option value="">Choose a sport...</option>
+                            <option value="table_tennis">🏓 Table Tennis</option>
+                            <option value="boxing">🥊 Boxing</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="skillLevel">Skill Level</label>
+                        <select id="skillLevel" class="form-select" required>
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="dominantHand">Dominant Hand</label>
+                        <select id="dominantHand" class="form-select" required>
+                            <option value="right">Right</option>
+                            <option value="left">Left</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-2">
+                        <div class="form-group">
+                            <label class="form-label" for="height">Height (cm)</label>
+                            <input type="number" id="height" class="form-input" min="100" max="250">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="weight">Weight (kg)</label>
+                            <input type="number" id="weight" class="form-input" min="30" max="200">
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Create Account</button>
+            </form>
+            <p class="text-center mt-3">
+                Already have an account? 
+                <a href="#" id="showLoginLink" style="color: var(--primary-color); font-weight: 500;">Login</a>
+            </p>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loadingSpinner" class="hidden">
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <script src="../js/auth.js"></script>
+</body>
+</html>
