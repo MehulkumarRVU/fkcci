@@ -199,10 +199,35 @@ function showAlert(message, type = 'info') {
 }
 
 // Check if already logged in
+// Check if already logged in
 if (localStorage.getItem('token')) {
-    // If on login page and already authenticated, redirect to dashboard
+    // If on login page and already authenticated, only redirect when we
+    // also have the athlete info. If athlete info is missing, attempt
+    // to fetch it from the backend and populate localStorage first.
     if (window.location.pathname.includes('login.html')) {
-        window.location.href = 'dashboard.html';
+        const athleteStr = localStorage.getItem('athlete');
+        if (athleteStr) {
+            window.location.href = 'dashboard.html';
+        } else {
+            // try to populate athlete info from the backend
+            fetch(`${API_URL}/api/auth/me`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Not authenticated');
+                return res.json();
+            })
+            .then(data => {
+                localStorage.setItem('athlete', JSON.stringify(data));
+                window.location.href = 'dashboard.html';
+            })
+            .catch(() => {
+                // Token invalid or fetch failed — clear token and remain on login
+                localStorage.removeItem('token');
+            });
+        }
     }
 }
 

@@ -181,7 +181,22 @@ document.getElementById('updatePreferencesForm').addEventListener('submit', asyn
         localStorage.setItem('athlete', JSON.stringify(athlete));
 
         showAlert('Training preferences updated successfully!', 'success');
-        loadProfile();
+
+        // Brief UX: disable submit and refresh profile after 1s
+        const prefBtn = document.querySelector('#updatePreferencesForm button[type="submit"]');
+        if (prefBtn) {
+            prefBtn.disabled = true;
+            const originalText = prefBtn.textContent;
+            prefBtn.textContent = 'Updating...';
+            setTimeout(async () => {
+                await loadProfile();
+                prefBtn.disabled = false;
+                prefBtn.textContent = originalText;
+            }, 1000);
+        } else {
+            // Fallback: refresh immediately
+            setTimeout(() => loadProfile(), 1000);
+        }
 
     } catch (error) {
         console.error('Error updating preferences:', error);

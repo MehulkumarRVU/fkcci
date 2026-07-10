@@ -65,6 +65,9 @@ class AthleteResponse(BaseModel):
     linked_sports: List[str]
     skill_level: str
     dominant_hand: str
+    height: Optional[float] = None
+    weight: Optional[float] = None
+    training_frequency_per_week: int = 0
     membership_tier: str
     total_sessions: int
     performance_rating: float
@@ -118,6 +121,9 @@ def athlete_to_response(athlete: Athlete) -> AthleteResponse:
         linked_sports=linked_sports,
         skill_level=athlete.skill_level,
         dominant_hand=athlete.dominant_hand,
+        height=athlete.height,
+        weight=athlete.weight,
+        training_frequency_per_week=athlete.training_frequency_per_week,
         membership_tier=athlete.membership_tier,
         total_sessions=athlete.total_sessions,
         performance_rating=athlete.performance_rating,
