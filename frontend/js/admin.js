@@ -5,10 +5,13 @@ let coachAthletes = [];
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    const token = localStorage.getItem('token');
-    const athlete = JSON.parse(localStorage.getItem('athlete') || '{}');
+    if (!getAuthToken()) {
+        window.location.href = '../index.html';
+        return;
+    }
 
-    if (!token || athlete.role !== 'coach') {
+    const athlete = JSON.parse(localStorage.getItem('athlete') || '{}');
+    if (athlete.role !== 'coach') {
         window.location.href = '../index.html';
         return;
     }
@@ -23,11 +26,12 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 async function loadCoachSummary() {
     try {
-        const response = await fetch(`${API_BASE_URL}/analytics/coach/summary`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/summary`);
 
         if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                return handleUnauthorized();
+            }
             throw new Error(`HTTP ${response.status}`);
         }
 
@@ -57,9 +61,14 @@ async function loadCoachSummary() {
  */
 async function loadAthletes() {
     try {
-        const response = await fetch(`${API_BASE_URL}/analytics/coach/athletes`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/athletes`);
+
+        if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                return handleUnauthorized();
+            }
+            throw new Error(`HTTP ${response.status}`);
+        }
 
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
@@ -140,16 +149,19 @@ function displayAthletes(athletes) {
  */
 async function loadAthleteMonthlyStats(athleteId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/analytics/coach/athlete/${athleteId}/monthly-report`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/athlete/${athleteId}/monthly-report`);
 
-        if (response.ok) {
-            const data = await response.json();
-            const element = document.getElementById(`sessions-${athleteId}`);
-            if (element) {
-                element.textContent = data.this_month_sessions;
+        if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                return handleUnauthorized();
             }
+            return;
+        }
+
+        const data = await response.json();
+        const element = document.getElementById(`sessions-${athleteId}`);
+        if (element) {
+            element.textContent = data.this_month_sessions;
         }
     } catch (error) {
         console.error(`Error loading stats for athlete ${athleteId}:`, error);
@@ -193,11 +205,12 @@ async function viewAthleteDetails(athleteId) {
     modal.classList.add('show');
 
     try {
-        const response = await fetch(`${API_BASE_URL}/analytics/coach/athlete/${athleteId}/monthly-report`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/athlete/${athleteId}/monthly-report`);
 
         if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                return handleUnauthorized();
+            }
             throw new Error(`HTTP ${response.status}`);
         }
 

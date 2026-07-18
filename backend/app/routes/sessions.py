@@ -57,11 +57,13 @@ async def create_session(
     db: Session = Depends(get_db)
 ):
     """Create a new training session"""
+    from ..sports_registry import is_valid_sport
+
     # Validate sport type
-    if session_data.sport_type not in ["table_tennis", "boxing"]:
+    if not is_valid_sport(session_data.sport_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="sport_type must be 'table_tennis' or 'boxing'"
+            detail="Invalid sport_type"
         )
     
     # Validate session type

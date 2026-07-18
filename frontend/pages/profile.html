@@ -46,7 +46,9 @@
                     </div>
                     <div>
                         <strong>Connected Sports:</strong>
-                        <p id="profileLinkedSports">-</p>
+                        <select id="profileLinkedSportsInfo" class="form-select" multiple disabled>
+                            <option value="">Loading...</option>
+                        </select>
                     </div>
                     <div>
                         <strong>Skill Level:</strong>
@@ -99,17 +101,16 @@
             <h3 class="card-header">Training Preferences</h3>
             <form id="updatePreferencesForm">
                 <div class="form-group">
-                    <label class="form-label">Connected Sports</label>
-                    <div class="flex gap-2">
-                        <label><input type="checkbox" id="linkBoxing" value="boxing"> 🥊 Boxing</label>
-                        <label><input type="checkbox" id="linkTableTennis" value="table_tennis"> 🏓 Table Tennis</label>
+                    <label class="form-label" for="profileLinkedSportsDropdown">Connected Sports</label>
+                    <div class="checkbox-dropdown" id="profileLinkedSportsDropdown">
+                        <button type="button" class="dropdown-toggle" id="linkedSportsToggle">Select connected sports</button>
+                        <div class="dropdown-menu" id="linkedSportsMenu"></div>
                     </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="updateActiveSport">Active Sport</label>
                     <select id="updateActiveSport" class="form-select">
-                        <option value="boxing">🥊 Boxing</option>
-                        <option value="table_tennis">🏓 Table Tennis</option>
+                        <option value="">Select a connected sport</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -147,6 +148,7 @@
         </div>
     </div>
 
+    <script src="../js/auth-utils.js"></script>
     <script>
         // Show admin link for coaches
         document.addEventListener('DOMContentLoaded', function() {

@@ -15,6 +15,7 @@
     --success-color: #22c55e;
     --table-tennis-color: #ff6b35;
     --boxing-color: #8b5cf6;
+    --badminton-color: #10a5c2;
 }
 
 /* Reset and Base Styles */
@@ -202,6 +203,62 @@ p {
     border-color: var(--primary-color);
 }
 
+.checkbox-dropdown {
+    position: relative;
+}
+
+.dropdown-toggle {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: 0.5rem;
+    background: #fff;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    width: 100%;
+    max-height: 280px;
+    overflow-y: auto;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    background: #fff;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    z-index: 20;
+}
+
+.checkbox-dropdown.open .dropdown-menu {
+    display: block;
+}
+
+.dropdown-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.25rem;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+}
+
+.dropdown-option:last-child {
+    border-bottom: none;
+}
+
+.dropdown-option input {
+    width: 16px;
+    height: 16px;
+}
+
+.dropdown-option:hover {
+    background: #f8fafc;
+}
+
 .form-error {
     color: var(--danger-color);
     font-size: 0.875rem;
@@ -281,6 +338,14 @@ p {
 
 .sport-card.boxing:hover {
     background-color: rgba(139, 92, 246, 0.05);
+}
+
+.sport-card.badminton {
+    border-color: var(--badminton-color);
+}
+
+.sport-card.badminton:hover {
+    background-color: rgba(16, 165, 194, 0.08);
 }
 
 .sport-icon {

@@ -76,7 +76,63 @@ function getScoreClass(score) {
 
 // Get sport display name
 function getSportDisplayName(sportType) {
-    return sportType === 'table_tennis' ? '🏓 Table Tennis' : '🥊 Boxing';
+    const map = {
+        table_tennis: '🏓 Table Tennis',
+        boxing: '🥊 Boxing',
+        badminton: '🏸 Badminton',
+        tennis: '🎾 Tennis',
+        pickleball: '🥎 Pickleball',
+        squash: '🏓 Squash',
+        kickboxing: '🥊 Kickboxing',
+        muay_thai: '🦵 Muay Thai',
+        karate: '🥋 Karate',
+        taekwondo: '🥋 Taekwondo',
+        judo: '🥋 Judo',
+        bjj: '🥋 BJJ',
+        wrestling: '🤼 Wrestling',
+        fencing: '🤺 Fencing',
+        basketball: '🏀 Basketball',
+        volleyball: '🏐 Volleyball',
+        handball: '🤾 Handball',
+        indoor_archery: '🏹 Indoor Archery',
+        ai_gym_coach: '🏋️ AI Gym Coach',
+        stretching: '🤸 Stretching',
+        mobility_training: '🦴 Mobility Training',
+        rehabilitation: '🩺 Rehabilitation',
+        home_workouts: '🏠 Home Workouts',
+        calisthenics: '💪 Calisthenics'
+    };
+    return map[sportType] || sportType;
+}
+
+function getSportIcon(sportType) {
+    const map = {
+        table_tennis: '🏓',
+        boxing: '🥊',
+        badminton: '🏸',
+        tennis: '🎾',
+        pickleball: '🥎',
+        squash: '🏓',
+        kickboxing: '🥊',
+        muay_thai: '🦵',
+        karate: '🥋',
+        taekwondo: '🥋',
+        judo: '🥋',
+        bjj: '🥋',
+        wrestling: '🤼',
+        fencing: '🤺',
+        basketball: '🏀',
+        volleyball: '🏐',
+        handball: '🤾',
+        indoor_archery: '🏹',
+        ai_gym_coach: '🏋️',
+        stretching: '🤸',
+        mobility_training: '🦴',
+        rehabilitation: '🩺',
+        home_workouts: '🏠',
+        calisthenics: '💪'
+    };
+    return map[sportType] || '🏅';
 }
 
 console.log('PocketCoach AI - App initialized');

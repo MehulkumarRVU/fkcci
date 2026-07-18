@@ -1,12 +1,18 @@
+from pathlib import Path
 from sqlalchemy import create_engine, text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./pocketcoach.db"
+from .config import settings
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
+if SQLALCHEMY_DATABASE_URL.startswith("sqlite:///./"):
+    project_root = Path(__file__).resolve().parents[1]
+    sqlite_path = project_root / SQLALCHEMY_DATABASE_URL.replace("sqlite:///./", "")
+    SQLALCHEMY_DATABASE_URL = f"sqlite:///{sqlite_path.as_posix()}"
+
+CONNECT_ARGS = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=CONNECT_ARGS)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -22,8 +28,13 @@ def get_db():
         db.close()
 
 
-def init_database():
-    """Initialize database and create all tables"""
+def init_database() -> None:
+    """Initialize database tables and compatibility columns."""
+    from .models.athlete import Athlete  # noqa: F401
+    from .models.refresh_token import RefreshToken  # noqa: F401
+    from .models.session import Session as TrainingSession  # noqa: F401
+    from .models.skill import Skill  # noqa: F401
+
     Base.metadata.create_all(bind=engine)
 
     with engine.begin() as connection:
@@ -48,3 +59,10 @@ def init_database():
                 """
             )
         )
+
+    # Seed default skills if none exist yet
+    from .seed_data import seed_default_skills_if_empty
+    from .database import SessionLocal as _SessionLocal
+
+    with _SessionLocal() as db:
+        seed_default_skills_if_empty(db)

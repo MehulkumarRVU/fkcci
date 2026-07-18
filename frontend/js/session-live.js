@@ -1,10 +1,7 @@
 // PocketCoach AI - Live Session Module
 const API_URL = 'http://localhost:8080';
 
-const token = localStorage.getItem('token');
-if (!token) {
-    window.location.href = 'login.html';
-}
+requireAuth();
 
 let currentSession = null;
 let currentSkill = null;
@@ -14,6 +11,7 @@ let sessionStartTime = null;
 let sessionTimer = null;
 let fpsTimer = null;
 let athlete = null;
+let sessionType = null;
 let analysisFrameCount = 0;
 
 function setCameraStatus(message, isError = false) {
@@ -35,6 +33,7 @@ async function initLiveSession() {
     const activeSession = JSON.parse(activeSessionRaw);
     currentSession = activeSession.session;
     currentSkill = activeSession.skill;
+    sessionType = activeSession.sessionType;
     sessionStartTime = activeSession.startedAt || Date.now();
 
     document.getElementById('logoutBtn').addEventListener('click', (e) => {
@@ -63,8 +62,13 @@ async function initLiveSession() {
     document.getElementById('commonMistakes').textContent = currentSkill.common_mistakes || '-';
     document.getElementById('safetyWarning').textContent = currentSkill.safety_warning || 'None';
 
+    const sessionModeMessage = document.getElementById('sessionModeMessage');
+    if (sessionModeMessage) {
+        sessionModeMessage.textContent = getSessionTypeHint(sessionType);
+    }
+
     poseDetector = new PoseDetector();
-    sportsAnalyzer = new SportsAnalyzer(athlete.sport_type);
+    sportsAnalyzer = new SportsAnalyzer(athlete.sport_type, sessionType);
 
     await poseDetector.initialize(
         document.getElementById('webcam'),
@@ -137,12 +141,8 @@ async function sendToBackendForAnalysis(landmarks) {
     try {
         const landmarksArray = poseDetector.landmarksToArray(landmarks);
 
-        const response = await fetch(`${API_URL}/api/analysis/realtime-feedback`, {
+        const response = await fetchWithAuth(`${API_URL}/api/analysis/realtime-feedback`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
             body: JSON.stringify({
                 sport_type: athlete.sport_type,
                 skill_name: currentSkill.name,
@@ -167,6 +167,14 @@ async function sendToBackendForAnalysis(landmarks) {
     } catch (error) {
         console.error('Error sending to backend:', error);
     }
+}
+
+function handleUnauthorized() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('athlete');
+    localStorage.removeItem('refresh_token');
+    sessionStorage.removeItem('activeSession');
+    window.location.href = 'login.html';
 }
 
 function updateLiveScore(overall, technique, reaction, balance) {
@@ -206,12 +214,8 @@ async function endSession() {
     const avgScore = sportsAnalyzer.getAverageScore();
 
     try {
-        const response = await fetch(`${API_URL}/api/sessions/${currentSession.id}`, {
+        const response = await fetchWithAuth(`${API_URL}/api/sessions/${currentSession.id}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
             body: JSON.stringify({
                 end_time: new Date().toISOString(),
                 duration_minutes: durationMinutes,
@@ -232,6 +236,16 @@ async function endSession() {
         console.error('Error ending session:', error);
         alert('Failed to save session data');
     }
+}
+
+function getSessionTypeHint(sessionType) {
+    const hints = {
+        drill: 'Drill sessions focus on repetition and technique refinement.',
+        shadow: 'Shadow training emphasizes balance and movement without impact.',
+        sparring: 'Sparring mode prioritizes guard, reaction, and positioning.',
+        match_simulation: 'Match simulation emphasizes intensity and realistic pacing.'
+    };
+    return hints[sessionType] || 'Perform this session with the correct focus for your chosen mode.';
 }
 
 function showSessionSummary(session) {

@@ -1,3 +1,15 @@
+### Rate Limiting (optional)
+
+The backend includes a rate-limiting middleware. You can tune it via environment variables:
+
+```
+RATE_LIMIT_REQUESTS=60
+RATE_LIMIT_WINDOW_SECONDS=60
+REDIS_URL=redis://localhost:6379/0   # optional: use Redis for distributed limits
+```
+
+If `REDIS_URL` is not set or Redis isn't available, an in-memory limiter is used (single-process only).
+
 # 🚀 Quick Start Guide - PocketCoach AI
 
 ## Complete Setup & Running Instructions
@@ -430,6 +442,24 @@ curl -H "Authorization: Bearer YOUR_TOKEN_HERE" \
 - **Database:** SQLite (no external dependencies)
 - **CORS:** Public access for development
 - **In Production:** Change SECRET_KEY and configure CORS
+
+**How to set `SECRET_KEY`**
+
+Create a `.env` file in the project root or set environment variables in your deployment environment. Example `.env` contents:
+
+```
+SECRET_KEY=your-very-long-random-secret
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_DAYS=7
+DATABASE_URL=sqlite:///./pocketcoach.db
+```
+
+On Windows PowerShell you can set it for the current session before starting the backend:
+
+```powershell
+$env:SECRET_KEY = 'your-very-long-random-secret'
+python backend\main.py
+```
 
 ---
 

@@ -1,11 +1,7 @@
 // PocketCoach AI - Session Management Module
 const API_URL = 'http://localhost:8080';
 
-// Check authentication
-const token = localStorage.getItem('token');
-if (!token) {
-    window.location.href = 'login.html';
-}
+requireAuth();
 
 // Global variables
 let athlete = null;
@@ -13,11 +9,26 @@ let athlete = null;
 // Initialize
 async function init() {
     athlete = JSON.parse(localStorage.getItem('athlete'));
-    if (!athlete) {
+
+    if (!athlete || !athlete.sport_type) {
+        try {
+            const authResponse = await fetchWithAuth(`${API_URL}/api/auth/me`);
+            if (!authResponse.ok) {
+                throw new Error('Unable to refresh athlete profile');
+            }
+            athlete = await authResponse.json();
+            localStorage.setItem('athlete', JSON.stringify(athlete));
+        } catch (error) {
+            window.location.href = 'login.html';
+            return;
+        }
+    }
+
+    if (!athlete || !athlete.sport_type) {
         window.location.href = 'login.html';
         return;
     }
-    
+
     // Setup logout button
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
@@ -57,7 +68,10 @@ async function loadSkills() {
         let skills = await response.json();
 
         if (!Array.isArray(skills) || skills.length === 0) {
-            await fetch(`${API_URL}/api/skills/seed`, { method: 'POST' });
+            const seedResponse = await fetch(`${API_URL}/api/skills/seed`, { method: 'POST' });
+            if (!seedResponse.ok) {
+                console.warn('Skill seed endpoint failed:', seedResponse.status, seedResponse.statusText);
+            }
             response = await fetch(`${API_URL}/api/skills/?sport_type=${athlete.sport_type}`);
             if (!response.ok) {
                 throw new Error('Failed to fetch skills after seeding');
@@ -65,6 +79,14 @@ async function loadSkills() {
             skills = await response.json();
         }
 
+        if (!Array.isArray(skills) || skills.length === 0) {
+            skillSelect.innerHTML = '<option value="">No skills available for your sport</option>';
+            skillSelect.disabled = true;
+            alert(`No skills found for sport ${athlete.sport_type}. Please contact support or try again later.`);
+            return;
+        }
+
+        skillSelect.disabled = false;
         skillSelect.innerHTML = '<option value="">Select a skill...</option>';
 
         skills.forEach(skill => {
@@ -114,17 +136,31 @@ async function startSession(e) {
 
     try {
         // Create session in backend
-        const response = await fetch(`${API_URL}/api/sessions/`, {
+        const response = await fetchWithAuth(`${API_URL}/api/sessions/`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
             body: JSON.stringify({
                 sport_type: athlete.sport_type,
                 session_type: sessionType
             })
         });
+
+        if (!response.ok) {
+            let detail = 'Failed to create session';
+            try {
+                const errorData = await response.json();
+                if (typeof errorData.detail === 'string') {
+                    detail = errorData.detail;
+                }
+            } catch {
+                // Ignore parse errors and keep fallback detail
+            }
+
+            if (response.status === 401 || response.status === 403) {
+                handleUnauthorized();
+                return;
+            }
+            throw new Error(detail);
+        }
 
         if (!response.ok) {
             let detail = 'Failed to create session';

@@ -118,6 +118,35 @@ pocket-coach/
 ## 🚀 Getting Started
 
 ### Prerequisites
+
+## Development
+
+- Backend: see `backend/`
+- Frontend: see `frontend/`
+
+Local dev (recommended):
+
+1. Copy `.env.example` to `.env` and set `SECRET_KEY` to a secure random value.
+
+2. Create and activate a virtualenv, then install deps:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\Activate.ps1 on Windows
+pip install -r backend/requirements.txt
+pip install -r backend/dev-requirements.txt
+```
+
+3. Run the backend and tests (helper script starts server, waits for /health, runs pytest):
+
+```bash
+# Linux/macOS
+bash backend/scripts/start_server_for_tests.sh &
+python -m pytest -q
+
+# Windows (PowerShell helper)
+powershell -ExecutionPolicy Bypass -File backend/scripts/run_tests_with_server.ps1
+```
 - Python 3.8 or higher
 - Modern web browser (Chrome, Firefox, Edge)
 - Webcam access

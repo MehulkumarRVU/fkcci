@@ -43,18 +43,21 @@ async def analyze_technique(
 ):
     """Analyze athlete's technique based on pose data"""
     
-    if request.sport_type not in ["table_tennis", "boxing"]:
+    from ..sports_registry import is_valid_sport
+
+    if not is_valid_sport(request.sport_type):
         raise HTTPException(status_code=400, detail="Invalid sport type")
     
     if not request.pose_data:
         raise HTTPException(status_code=400, detail="No pose data provided")
     
-    # Import analyzer here to avoid circular imports
-    from ..utils.sports_pose_analyzer import SportsPoseAnalyzer
+    from ..pose_engine.analyzer_factory import AnalyzerFactory
     
-    analyzer = SportsPoseAnalyzer(request.sport_type)
+    try:
+        analyzer = AnalyzerFactory.get_analyzer(request.sport_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     
-    # Analyze each frame
     frame_results = []
     for pose in request.pose_data:
         result = analyzer.analyze_frame(pose.landmarks, request.skill_name)
@@ -101,15 +104,20 @@ async def get_realtime_feedback(
 ):
     """Get instant feedback for a single frame"""
     
-    if request.sport_type not in ["table_tennis", "boxing"]:
+    from ..sports_registry import is_valid_sport
+
+    if not is_valid_sport(request.sport_type):
         raise HTTPException(status_code=400, detail="Invalid sport type")
 
     if not request.landmarks:
         raise HTTPException(status_code=400, detail="No landmarks provided")
     
-    from ..utils.sports_pose_analyzer import SportsPoseAnalyzer
+    from ..pose_engine.analyzer_factory import AnalyzerFactory
     
-    analyzer = SportsPoseAnalyzer(request.sport_type)
+    try:
+        analyzer = AnalyzerFactory.get_analyzer(request.sport_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     result = analyzer.analyze_frame(request.landmarks, request.skill_name)
-    
     return result

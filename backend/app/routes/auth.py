@@ -12,16 +12,17 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models.athlete import Athlete
+from ..config import settings
+from ..sports_registry import is_valid_sport, VALID_SPORTS
 
 try:
     import bcrypt
 except ImportError:
     bcrypt = None
 
-# Security Configuration
-SECRET_KEY = "your-secret-key-change-in-production-use-env-variable"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 7
+# Security Configuration (loaded from environment via settings)
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_DAYS = settings.ACCESS_TOKEN_EXPIRE_DAYS
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -32,7 +33,7 @@ class AthleteCreate(BaseModel):
     email: EmailStr
     username: str
     password: str
-    sport_type: str  # table_tennis or boxing
+    sport_type: str  # table_tennis, boxing, or badminton
     skill_level: Optional[str] = "beginner"
     dominant_hand: Optional[str] = "right"
     height: Optional[float] = None
@@ -93,7 +94,6 @@ class TokenData(BaseModel):
     username: Optional[str] = None
 
 
-VALID_SPORTS = {"table_tennis", "boxing"}
 
 
 def normalize_linked_sports(linked_sports: Optional[List[str]]) -> List[str]:
@@ -184,7 +184,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     else:
         expire = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
@@ -197,7 +197,7 @@ async def get_current_athlete(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -209,6 +209,44 @@ async def get_current_athlete(
     if athlete is None:
         raise credentials_exception
     return athlete
+
+
+# Refresh token helpers
+from ..models.refresh_token import RefreshToken
+
+
+def create_refresh_token(db: Session, athlete: Athlete, expires_days: int = 30) -> str:
+    token = secrets.token_urlsafe(32)
+    # Use HMAC with SECRET_KEY to avoid storing plain SHA256(token) (harder to precompute)
+    token_hash = hmac.new(settings.SECRET_KEY.encode(), token.encode(), hashlib.sha256).hexdigest()
+    expires_at = datetime.utcnow() + timedelta(days=expires_days)
+    rt = RefreshToken(
+        athlete_id=athlete.id, token_hash=token_hash, expires_at=expires_at, revoked=False
+    )
+    db.add(rt)
+    db.commit()
+    db.refresh(rt)
+    return token
+
+
+def verify_refresh_token(db: Session, token: str) -> Optional[RefreshToken]:
+    token_hash = hmac.new(settings.SECRET_KEY.encode(), token.encode(), hashlib.sha256).hexdigest()
+    rt = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash, RefreshToken.revoked == False).first()
+    if not rt:
+        return None
+    if rt.expires_at < datetime.utcnow():
+        return None
+    return rt
+
+
+def revoke_refresh_token(db: Session, token: str) -> bool:
+    token_hash = hmac.new(settings.SECRET_KEY.encode(), token.encode(), hashlib.sha256).hexdigest()
+    rt = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
+    if not rt:
+        return False
+    rt.revoked = True
+    db.commit()
+    return True
 
 
 # Routes
@@ -230,10 +268,10 @@ async def signup(athlete_data: AthleteCreate, db: Session = Depends(get_db)):
         )
     
     # Validate sport type
-    if athlete_data.sport_type not in VALID_SPORTS:
+    if not is_valid_sport(athlete_data.sport_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="sport_type must be 'table_tennis' or 'boxing'"
+            detail="Invalid sport_type"
         )
     
     # Create new athlete
@@ -280,8 +318,8 @@ async def signup_coach(coach_data: CoachCreate, db: Session = Depends(get_db)):
         username=coach_data.username,
         hashed_password=get_password_hash(coach_data.password),
         role="coach",
-        sport_type="boxing",  # Default, coaches can manage both
-        linked_sports="boxing,table_tennis"
+        sport_type="boxing",  # Default, coaches can manage supported sports
+        linked_sports="boxing,table_tennis,badminton"
     )
     
     db.add(new_coach)
@@ -297,7 +335,11 @@ async def signup_coach(coach_data: CoachCreate, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/login", response_model=Token)
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post("/login")
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
@@ -322,8 +364,37 @@ async def login(
     access_token = create_access_token(
         data={"sub": athlete.username}, expires_delta=access_token_expires
     )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
+
+    # create a refresh token and persist its hash
+    refresh_token = create_refresh_token(db, athlete)
+
+    return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token}
+
+
+
+@router.post("/token/refresh")
+async def refresh_with_token(
+    request: RefreshRequest, db: Session = Depends(get_db)
+):
+    """Exchange a valid refresh token for a new access token (rotates refresh token)."""
+    rt = verify_refresh_token(db, request.refresh_token)
+    if not rt:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token"
+        )
+
+    athlete = db.query(Athlete).filter(Athlete.id == rt.athlete_id).first()
+    if not athlete:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token owner")
+
+    # rotate: revoke old and issue new
+    revoke_refresh_token(db, request.refresh_token)
+    new_refresh = create_refresh_token(db, athlete)
+
+    access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+    access_token = create_access_token(data={"sub": athlete.username}, expires_delta=access_token_expires)
+
+    return {"access_token": access_token, "token_type": "bearer", "refresh_token": new_refresh}
 
 
 @router.get("/me", response_model=AthleteResponse)
@@ -351,10 +422,10 @@ async def update_profile(
         current_athlete.linked_sports = ",".join(linked_sports)
 
     if profile_data.sport_type is not None:
-        if profile_data.sport_type not in VALID_SPORTS:
+        if not is_valid_sport(profile_data.sport_type):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="sport_type must be 'table_tennis' or 'boxing'"
+                detail="Invalid sport_type"
             )
 
         linked_sports = [sport for sport in (current_athlete.linked_sports or "").split(",") if sport]
