@@ -2,7 +2,9 @@
 
 **AI-Powered Real-Time Sports Technique Coach**
 
-PocketCoach AI is an intelligent training system that uses device cameras and AI pose detection to provide real-time feedback for **Table Tennis 🏓** and **Boxing 🥊** athletes. Perfect for beginners, intermediate, and advanced athletes looking to improve their technique, reaction time, and overall performance.
+PocketCoach AI is an intelligent training system that uses device cameras and AI pose detection to provide real-time feedback for **Table Tennis 🏓**, **Boxing 🥊**, and a growing set of indoor sports. Perfect for beginners, intermediate, and advanced athletes looking to improve their technique, reaction time, and overall performance.
+
+Phase 1 UI now includes indoor sports integration with enhanced dashboard, session setup, profile management, and live training flow.
 
 ---
 
