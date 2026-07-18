@@ -22,38 +22,58 @@ Phase 1 UI now includes indoor sports integration with enhanced dashboard, sessi
 - Balance & Stability Metrics
 - Overall Performance Rating
 
-### 🏓 Table Tennis Module
-**Skills Supported:**
-- Forehand Drive
-- Backhand Drive
-- Topspin & Backspin
-- Serve Technique
-- Side Shuffle Footwork
-- Smash
+### � Supported Sports & Drills
+PocketCoach AI supports a broad set of indoor sports and training categories. Detailed skill drills are currently seeded for Table Tennis, Boxing, and Badminton, while additional supported sports are available with baseline technique drills.
 
-**Analysis Includes:**
-- Shoulder-Elbow-Wrist angles
-- Knee flexion
-- Hip rotation
-- Stance width
-- Swing arc path
-- Weight transfer
+#### Sports with detailed drills
+- **Table Tennis 🏓**
+  - Forehand Drive
+  - Backhand Drive
+  - Topspin
+  - Backspin
+  - Serve Technique
+  - Side Shuffle Footwork
+  - Smash
+- **Boxing 🥊**
+  - Jab
+  - Cross
+  - Hook
+  - Uppercut
+  - Guard Position
+  - Slip & Roll
+  - Pivot Footwork
+- **Badminton 🏸**
+  - Serve Technique
+  - Clear
+  - Smash
+  - Drop Shot
+  - Net Play
+  - Split Step Footwork
 
-### 🥊 Boxing Module
-**Skills Supported:**
-- Jab, Cross, Hook, Uppercut
-- Guard Position
-- Slip & Roll Defense
-- Pivot Footwork
-- Combination Drills
+#### Additional supported sports
+- Tennis 🎾
+- Pickleball 🥎
+- Squash 🏓
+- Kickboxing 🥊
+- Muay Thai 🦵
+- Karate 🥋
+- Taekwondo 🥋
+- Judo 🥋
+- Brazilian Jiu-Jitsu 🥋
+- Wrestling 🤼
+- Fencing 🤺
+- Basketball 🏀
+- Volleyball 🏐
+- Handball 🤾
+- Indoor Archery 🏹
+- AI Gym Coach 🏋️
+- Stretching 🤸
+- Mobility Training 🦴
+- Rehabilitation 🩺
+- Home Workouts 🏠
+- Calisthenics 💪
 
-**Analysis Includes:**
-- Punch extension angles
-- Shoulder & hip rotation
-- Guard hand height
-- Foot pivot alignment
-- Balance stability
-- Recovery speed
+> For each additional supported sport, PocketCoach seeds a baseline drill named **Basic &lt;sport&gt; Technique** to provide a starting point for technique analysis and future drill expansion.
 
 ---
 
