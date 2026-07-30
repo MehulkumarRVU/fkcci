@@ -1,6 +1,6 @@
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -21,8 +21,16 @@ class Settings(BaseSettings):
     # Rate limiting
     RATE_LIMIT_REQUESTS: int = Field(60)
     RATE_LIMIT_WINDOW_SECONDS: int = Field(60)
-    REDIS_URL: Optional[str] = Field(None)
+    REDIS_URL: Optional[str] = Field("redis://redis:6379/0")
+    CORS_ALLOWED_ORIGINS: List[str] = Field(default_factory=lambda: ["*"])
     ENV: str = Field("development")
+
+    @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def split_cors_origins(cls, v):
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     @field_validator("SECRET_KEY")
     @classmethod

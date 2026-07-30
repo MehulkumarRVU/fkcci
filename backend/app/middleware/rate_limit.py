@@ -60,14 +60,24 @@ class RateLimitMiddleware:
                 import redis.asyncio as aioredis
 
                 redis_client = aioredis.from_url(self.redis_url)
-                # Use UTF-8 keys
-                self.bucket = RedisBucket(redis_client, self.requests, self.window)
-                return
+                try:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(redis_client.ping())
+                    loop.close()
+                    self.bucket = RedisBucket(redis_client, self.requests, self.window)
+                    return
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        asyncio.set_event_loop(None)
+                    except RuntimeError:
+                        pass
             except Exception:
-                # Fall back to in-memory if Redis not available or error
                 pass
 
-        # default fallback
+        # Default fallback to local in-memory rate limiter.
         self.bucket = InMemoryBucket(self.requests, self.window)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

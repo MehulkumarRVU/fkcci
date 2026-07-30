@@ -10,7 +10,9 @@ let athlete = null;
 async function init() {
     athlete = JSON.parse(localStorage.getItem('athlete'));
 
-    if (!athlete || !athlete.sport_type) {
+    if (athlete && athlete.sport_type) {
+        await refreshAthleteFromServer();
+    } else {
         try {
             const authResponse = await fetchWithAuth(`${API_URL}/api/auth/me`);
             if (!authResponse.ok) {
@@ -106,6 +108,22 @@ async function loadSkills() {
         console.error('Error loading skills:', error);
         skillSelect.innerHTML = '<option value="">Unable to load skills</option>';
         alert('Failed to load skills. Ensure backend is running on port 8080.');
+    }
+}
+
+async function refreshAthleteFromServer() {
+    try {
+        const authResponse = await fetchWithAuth(`${API_URL}/api/auth/me`);
+        if (!authResponse.ok) {
+            throw new Error('Unable to refresh athlete profile');
+        }
+        const latestAthlete = await authResponse.json();
+        if (latestAthlete && latestAthlete.sport_type) {
+            athlete = latestAthlete;
+            localStorage.setItem('athlete', JSON.stringify(athlete));
+        }
+    } catch (error) {
+        console.warn('Could not refresh athlete profile:', error);
     }
 }
 

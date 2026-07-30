@@ -79,6 +79,30 @@ PocketCoach AI supports a broad set of indoor sports and training categories. De
 
 ## 🏗️ Architecture
 
+### Docker & Cloud Readiness
+- Added `backend/Dockerfile` for containerized FastAPI deployment.
+- Added `docker-compose.yml` with `backend`, `postgres`, `redis`, and `nginx` services.
+- Added `.dockerignore` to reduce build context size.
+- Added `nginx.conf` for reverse proxying frontend requests to the backend.
+
+### Running with Docker
+1. Copy `.env.example` to `.env` and set `SECRET_KEY`.
+2. Start services:
+   ```bash
+   docker compose up --build
+   ```
+3. Backend API is available at `http://localhost:8080`.
+4. Nginx reverse proxy is available at `http://localhost`.
+
+### Environment variables
+- `DATABASE_URL` can point to PostgreSQL using `postgresql+psycopg2://user:password@host:port/dbname`
+- `REDIS_URL` enables Redis-backed rate limiting
+- `CORS_ALLOWED_ORIGINS` controls allowed origins for the API
+
+---
+
+## 🏗️ Architecture
+
 ### Backend (FastAPI + Python)
 - **Port:** 8080
 - **Framework:** FastAPI

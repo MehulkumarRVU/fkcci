@@ -180,6 +180,13 @@ The repository is organized into the following main directories:
 - frontend/js/: app logic, authentication, session handling, pose detection, and sports analysis modules
 - frontend/css/styles.css: styling for the interface
 
+### Dataset
+- dataset/import_archives.py: import and normalize archive2/archive3 datasets into the repo
+- dataset/archive2/: imported sport data from attached archive (2)
+- dataset/archive3/: imported archive3 dataset files and metadata
+- dataset/dataset_archive3_label_mapping.json: archive3 training label mapping and counts
+- dataset/archive_manifest.json: import summary manifest for archive2/archive3
+
 ---
 
 ## 10. Backend Design and Implementation

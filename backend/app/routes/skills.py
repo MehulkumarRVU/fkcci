@@ -109,11 +109,18 @@ async def create_skill(
 async def seed_skills(db: Session = Depends(get_db)):
     """Seed the database with default skills"""
     # Allow skill seeding for development and initial data population.
-    existing_skills = db.query(Skill).count()
-    if existing_skills > 0:
-        return {"message": f"Skills already seeded. Current count: {existing_skills}"}
-    
-    # Table Tennis Skills
+    result = seed_default_skills_if_empty(db)
+    if result["already_seeded"]:
+        return {"message": f"Skills already seeded. Current count: {result['existing_skills']}"}
+
+    return {
+        "message": "Added missing default skills",
+        "added_skills": result["added_skills"],
+        "existing_skills": result["existing_skills"],
+        "generic_skills": result["generic_skills"]
+    }
+
+# Table Tennis Skills
     table_tennis_skills = [
         {
             "name": "Forehand Drive",

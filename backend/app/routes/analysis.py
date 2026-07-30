@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Optional, Any
 from ..models.athlete import Athlete
+from ..services.analysis_service import AnalysisService
 from .auth import get_current_athlete
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
@@ -50,32 +51,23 @@ async def analyze_technique(
     
     if not request.pose_data:
         raise HTTPException(status_code=400, detail="No pose data provided")
-    
-    from ..pose_engine.analyzer_factory import AnalyzerFactory
-    
-    try:
-        analyzer = AnalyzerFactory.get_analyzer(request.sport_type)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    
-    frame_results = []
-    for pose in request.pose_data:
-        result = analyzer.analyze_frame(pose.landmarks, request.skill_name)
-        frame_results.append(result)
-    
-    # Aggregate results
+
+    analysis_service = AnalysisService()
+    frame_results = [
+        analysis_service.analyze_frame(request.sport_type, request.skill_name, pose.landmarks)
+        for pose in request.pose_data
+    ]
+
     avg_score = sum(r["score"] for r in frame_results) / len(frame_results)
     avg_technique = sum(r.get("technique_accuracy", 0) for r in frame_results) / len(frame_results)
     avg_balance = sum(r.get("balance_score", 0) for r in frame_results) / len(frame_results)
-    
-    # Collect unique feedback messages
+
     all_feedback = []
     for result in frame_results:
         all_feedback.extend(result.get("feedback", []))
-    
+
     unique_feedback = list(set(all_feedback))
-    
-    # Detailed analysis
+
     detailed = {
         "frames_analyzed": len(frame_results),
         "score_range": {
@@ -85,7 +77,7 @@ async def analyze_technique(
         },
         "skill_analyzed": request.skill_name
     }
-    
+
     return {
         "sport_type": request.sport_type,
         "skill_name": request.skill_name,
@@ -111,13 +103,7 @@ async def get_realtime_feedback(
 
     if not request.landmarks:
         raise HTTPException(status_code=400, detail="No landmarks provided")
-    
-    from ..pose_engine.analyzer_factory import AnalyzerFactory
-    
-    try:
-        analyzer = AnalyzerFactory.get_analyzer(request.sport_type)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    result = analyzer.analyze_frame(request.landmarks, request.skill_name)
+    analysis_service = AnalysisService()
+    result = analysis_service.analyze_frame(request.sport_type, request.skill_name, request.landmarks)
     return result

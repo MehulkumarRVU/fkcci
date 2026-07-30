@@ -10,3 +10,5 @@ email-validator>=2.2.0
 opencv-python>=4.10.0.84
 mediapipe>=0.10.20
 numpy>=1.26.0
+redis>=4.6.0
+psycopg2-binary>=2.9.8

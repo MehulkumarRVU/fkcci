@@ -14,6 +14,7 @@ from ..database import get_db
 from ..models.athlete import Athlete
 from ..config import settings
 from ..sports_registry import is_valid_sport, VALID_SPORTS
+from ..services.auth_service import AuthService
 
 try:
     import bcrypt
@@ -137,55 +138,14 @@ PBKDF2_ITERATIONS = 100_000
 PBKDF2_SALT_BYTES = 16
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    try:
-        if hashed_password.startswith("$2") and bcrypt is not None:
-            return bcrypt.checkpw(
-                plain_password.encode("utf-8"),
-                hashed_password.encode("utf-8"),
-            )
-
-        scheme, iterations_str, salt_b64, stored_hash_b64 = hashed_password.split("$", 3)
-        if scheme != "pbkdf2_sha256":
-            return False
-
-        iterations = int(iterations_str)
-        salt = base64.b64decode(salt_b64.encode("utf-8"))
-        stored_hash = base64.b64decode(stored_hash_b64.encode("utf-8"))
-
-        computed_hash = hashlib.pbkdf2_hmac(
-            PBKDF2_ALGORITHM,
-            plain_password.encode("utf-8"),
-            salt,
-            iterations,
-        )
-        return hmac.compare_digest(computed_hash, stored_hash)
-    except Exception:
-        return False
-
-
 def get_password_hash(password: str) -> str:
-    salt = secrets.token_bytes(PBKDF2_SALT_BYTES)
-    password_hash = hashlib.pbkdf2_hmac(
-        PBKDF2_ALGORITHM,
-        password.encode("utf-8"),
-        salt,
-        PBKDF2_ITERATIONS,
-    )
-    salt_b64 = base64.b64encode(salt).decode("utf-8")
-    hash_b64 = base64.b64encode(password_hash).decode("utf-8")
-    return f"pbkdf2_sha256${PBKDF2_ITERATIONS}${salt_b64}${hash_b64}"
+    auth_service = AuthService(db=None)
+    return auth_service.get_password_hash(password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    auth_service = AuthService(db=None)
+    return auth_service.create_access_token(data, expires_delta)
 
 
 async def get_current_athlete(
@@ -345,9 +305,10 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """Login and get access token"""
+    auth_service = AuthService(db)
     athlete = db.query(Athlete).filter(Athlete.username == form_data.username).first()
     
-    if not athlete or not verify_password(form_data.password, athlete.hashed_password):
+    if not athlete or not auth_service.verify_password(form_data.password, athlete.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -361,15 +322,13 @@ async def login(
         )
     
     access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    access_token = create_access_token(
+    access_token = auth_service.create_access_token(
         data={"sub": athlete.username}, expires_delta=access_token_expires
     )
 
-    # create a refresh token and persist its hash
-    refresh_token = create_refresh_token(db, athlete)
+    refresh_token = auth_service.create_refresh_token(athlete)
 
     return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token}
-
 
 
 @router.post("/token/refresh")
@@ -377,7 +336,8 @@ async def refresh_with_token(
     request: RefreshRequest, db: Session = Depends(get_db)
 ):
     """Exchange a valid refresh token for a new access token (rotates refresh token)."""
-    rt = verify_refresh_token(db, request.refresh_token)
+    auth_service = AuthService(db)
+    rt = auth_service.verify_refresh_token(request.refresh_token)
     if not rt:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token"
@@ -387,12 +347,11 @@ async def refresh_with_token(
     if not athlete:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token owner")
 
-    # rotate: revoke old and issue new
-    revoke_refresh_token(db, request.refresh_token)
-    new_refresh = create_refresh_token(db, athlete)
+    auth_service.revoke_refresh_token(request.refresh_token)
+    new_refresh = auth_service.create_refresh_token(athlete)
 
     access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    access_token = create_access_token(data={"sub": athlete.username}, expires_delta=access_token_expires)
+    access_token = auth_service.create_access_token(data={"sub": athlete.username}, expires_delta=access_token_expires)
 
     return {"access_token": access_token, "token_type": "bearer", "refresh_token": new_refresh}
 
