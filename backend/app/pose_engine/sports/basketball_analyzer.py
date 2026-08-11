@@ -1,5 +1,6 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from ..base_analyzer import BaseAnalyzer
+from ..shared.thresholds import scale_penalty
 from ..shared.utils import PoseUtils
 
 
@@ -7,48 +8,57 @@ class BasketballAnalyzer(BaseAnalyzer):
     def __init__(self):
         super().__init__(sport_type="basketball")
 
-    def analyze_frame(self, landmarks: List[Dict[str, float]], skill_name: str) -> Dict[str, Any]:
+    def analyze_frame(self, landmarks: List[Dict[str, float]], skill_name: str,
+                       skill_level: str = "beginner", dominant_hand: str = "right") -> Dict[str, Any]:
         feedback = []
         technique_score = 100.0
 
-        left_hip = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["LEFT_HIP"])
-        right_hip = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_HIP"])
         left_knee = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["LEFT_KNEE"])
         right_knee = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_KNEE"])
-        left_ankle = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["LEFT_ANKLE"])
-        right_ankle = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_ANKLE"])
         right_wrist = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_WRIST"])
         right_elbow = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_ELBOW"])
 
-        # Shooting elbow alignment: elbow should be above wrist and near shoulder level
-        if right_wrist["y"] < right_elbow["y"]:
-            feedback.append("✅ Elbow/wrist alignment good for shooting.")
-        else:
-            feedback.append("⚠️ Adjust elbow position for better shooting form.")
-            technique_score -= 8.0
+        # Shooting elbow alignment: elbow should be above wrist
+        if PoseUtils.is_confident(right_wrist) and PoseUtils.is_confident(right_elbow):
+            if right_wrist["y"] < right_elbow["y"]:
+                feedback.append("✅ Elbow/wrist alignment good for shooting.")
+            else:
+                feedback.append("⚠️ Adjust elbow position for better shooting form.")
+                technique_score -= scale_penalty(8.0, skill_level)
 
         # Jump/landing symmetry check
-        knee_diff = abs(left_knee["y"] - right_knee["y"])
-        if knee_diff > 0.08:
-            feedback.append("⚠️ Asymmetric landing - try to land evenly.")
-            technique_score -= 10.0
-        else:
-            feedback.append("✅ Even landing mechanics.")
+        knee_diff = None
+        if PoseUtils.is_confident(left_knee) and PoseUtils.is_confident(right_knee):
+            knee_diff = abs(left_knee["y"] - right_knee["y"])
+        delta, msg = self.check_max(
+            knee_diff, 0.08, skill_level, penalty=10,
+            pass_msg="✅ Even landing mechanics.",
+            fail_msg="⚠️ Asymmetric landing - try to land evenly.",
+        )
+        technique_score += delta
+        if msg:
+            feedback.append(msg)
 
         balance_score, balance_feedback = PoseUtils.analyze_balance(landmarks)
         feedback.append(balance_feedback)
 
-        overall_score = max(0.0, technique_score * 0.6 + balance_score * 0.4)
+        technique_score = max(0.0, technique_score)
+        overall_score = self.blend_scores(technique_score, balance_score, 0.6)
 
         return {
             "score": overall_score,
-            "technique_accuracy": max(0.0, technique_score),
+            "technique_accuracy": technique_score,
             "balance_score": balance_score,
             "feedback": feedback,
         }
 
-    def analyze_session(self, pose_sequence: List[List[Dict[str, float]]], skill_name: str) -> Dict[str, Any]:
-        # Provide basic jump count estimation by detecting peaks in average knee y
+    def analyze_session(self, pose_sequence: List[List[Dict[str, float]]], skill_name: str,
+                         skill_level: str = "beginner", dominant_hand: str = "right",
+                         timestamps: Optional[List[float]] = None) -> Dict[str, Any]:
+        result = super().analyze_session(pose_sequence, skill_name, skill_level, dominant_hand, timestamps)
+
+        # Basic jump count estimation by detecting peaks (troughs in y) in
+        # average knee height.
         knee_avgs = []
         for frame in pose_sequence:
             lk = PoseUtils.get_landmark(frame, PoseUtils.LANDMARKS["LEFT_KNEE"])
@@ -60,16 +70,8 @@ class BasketballAnalyzer(BaseAnalyzer):
             if knee_avgs[i] < knee_avgs[i - 1] - 0.02 and knee_avgs[i] < knee_avgs[i + 1] - 0.02:
                 jumps += 1
 
-        frame_results = [self.analyze_frame(frame, skill_name) for frame in pose_sequence]
-        avg_score = sum(r["score"] for r in frame_results) / len(frame_results) if frame_results else 0.0
-
-        return {
-            "overall_score": round(avg_score, 2),
-            "technique_accuracy": round(sum(r["technique_accuracy"] for r in frame_results) / len(frame_results), 2) if frame_results else 0.0,
-            "balance_score": round(sum(r["balance_score"] for r in frame_results) / len(frame_results), 2) if frame_results else 0.0,
-            "frame_count": len(frame_results),
-            "detailed": {"estimated_jumps": jumps},
-        }
+        result["detailed"] = {"estimated_jumps": jumps}
+        return result
 
     def get_supported_skills(self) -> List[str]:
         return ["Jump Shot", "Layup", "Landing Mechanics", "Footwork"]

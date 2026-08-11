@@ -13,6 +13,7 @@ let fpsTimer = null;
 let athlete = null;
 let sessionType = null;
 let analysisFrameCount = 0;
+let skeleton3D = null;
 
 function setCameraStatus(message, isError = false) {
     const statusEl = document.getElementById('cameraStatus');
@@ -68,7 +69,13 @@ async function initLiveSession() {
     }
 
     poseDetector = new PoseDetector();
-    sportsAnalyzer = new SportsAnalyzer(athlete.sport_type, sessionType);
+    sportsAnalyzer = new SportsAnalyzer(athlete.sport_type, sessionType, athlete.dominant_hand, athlete.skill_level);
+    skeleton3D = new Skeleton3D(document.getElementById('skeleton3dContainer'));
+
+    const toggle3dBtn = document.getElementById('toggle3dBtn');
+    if (toggle3dBtn) {
+        toggle3dBtn.addEventListener('click', toggle3dView);
+    }
 
     await poseDetector.initialize(
         document.getElementById('webcam'),
@@ -78,6 +85,36 @@ async function initLiveSession() {
     startSessionTimer();
     setCameraStatus('Starting camera and pose detection...');
     await startCamera();
+}
+
+async function toggle3dView() {
+    const toggle3dBtn = document.getElementById('toggle3dBtn');
+    const videoEl = document.getElementById('webcam');
+    const canvasEl = document.getElementById('poseCanvas');
+
+    if (skeleton3D.isActive()) {
+        skeleton3D.hide();
+        videoEl.style.display = '';
+        canvasEl.style.display = '';
+        toggle3dBtn.textContent = '🧍 Show Digital Twin (3D Skeleton)';
+        return;
+    }
+
+    toggle3dBtn.disabled = true;
+    toggle3dBtn.textContent = 'Loading 3D view...';
+    try {
+        await skeleton3D.init();
+        videoEl.style.display = 'none';
+        canvasEl.style.display = 'none';
+        skeleton3D.show();
+        toggle3dBtn.textContent = '📷 Show Camera View';
+    } catch (error) {
+        console.error('Failed to load 3D skeleton view:', error);
+        alert('Could not load the 3D Digital Twin view.');
+        toggle3dBtn.textContent = '🧍 Show Digital Twin (3D Skeleton)';
+    } finally {
+        toggle3dBtn.disabled = false;
+    }
 }
 
 async function startCamera() {
@@ -130,6 +167,17 @@ function onPoseResults(landmarks) {
 
     sportsAnalyzer.addFeedback(localAnalysis.feedback, localAnalysis.score);
 
+    // Purely additive - doesn't touch the existing 2D drawing/local-analysis
+    // path above, and no-ops until the user toggles the 3D view on.
+    if (skeleton3D && skeleton3D.isActive()) {
+        skeleton3D.updateFromLandmarks(landmarks);
+    }
+
+    // Downsampled buffer used at session end for a real, backend-computed
+    // technique/balance/reaction analysis of the whole session (not just a
+    // client-side running average).
+    sportsAnalyzer.addPoseSample(poseDetector.landmarksToArray(landmarks), Date.now());
+
     analysisFrameCount++;
     if (analysisFrameCount >= 30) {
         analysisFrameCount = 0;
@@ -152,12 +200,20 @@ async function sendToBackendForAnalysis(landmarks) {
 
         if (response.ok) {
             const analysis = await response.json();
+            sportsAnalyzer.addServerResult(analysis);
             updateLiveScore(
                 analysis.score,
                 analysis.technique_accuracy,
                 analysis.reaction_score || 0,
                 analysis.balance_score
             );
+
+            // Ideal-form overlay: color-codes the 3D skeleton's joints from
+            // the backend's own deviation classification (reuses the
+            // analyzer's real thresholds - not a second parallel JS copy).
+            if (skeleton3D && skeleton3D.isActive() && analysis.deviations) {
+                skeleton3D.renderDeviation(analysis.deviations);
+            }
 
             if (analysis.feedback && analysis.feedback.length > 0) {
                 const feedbackPanel = document.getElementById('feedbackPanel');
@@ -213,18 +269,68 @@ async function endSession() {
     const durationMinutes = Math.floor((Date.now() - sessionStartTime) / 60000);
     const avgScore = sportsAnalyzer.getAverageScore();
 
+    // Fallback values from real per-response server measurements tracked
+    // throughout the session (used only if the full-session analysis below
+    // can't run, e.g. an empty buffer or a network error) - never a
+    // fabricated multiplier of one client-side average.
+    const avgTechnique = sportsAnalyzer.getAverageTechnique();
+    const avgBalance = sportsAnalyzer.getAverageBalance();
+
+    let sessionUpdate = {
+        end_time: new Date().toISOString(),
+        duration_minutes: durationMinutes,
+        is_completed: true,
+        performance_score: avgScore,
+        technique_accuracy: avgTechnique !== null ? avgTechnique : avgScore,
+        balance_score: avgBalance !== null ? avgBalance : avgScore
+    };
+
+    // Full-session analysis: temporal smoothing, low-confidence frame
+    // rejection, and a real event-based reaction_score (or an honest
+    // "not_measured"/"insufficient_data" status instead of a guess).
+    const poseBuffer = sportsAnalyzer.getPoseBuffer();
+    if (poseBuffer.length > 0) {
+        try {
+            const response = await fetchWithAuth(`${API_URL}/api/analysis/analyze`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    sport_type: athlete.sport_type,
+                    skill_name: currentSkill.name,
+                    pose_data: poseBuffer,
+                    session_id: currentSession.id
+                })
+            });
+            if (response.ok) {
+                const analysis = await response.json();
+                if (analysis.supported && analysis.overall_score !== null) {
+                    sessionUpdate = {
+                        ...sessionUpdate,
+                        performance_score: analysis.overall_score,
+                        technique_accuracy: analysis.technique_accuracy,
+                        balance_score: analysis.balance_score,
+                        // null when reaction_status isn't "measured" - stored
+                        // as an honest missing value, never a fabricated number.
+                        reaction_score: analysis.reaction_score,
+                        session_data: {
+                            reaction_status: analysis.reaction_status,
+                            pose_confidence: analysis.pose_confidence,
+                            calibration_status: analysis.calibration_status
+                        },
+                        joint_summary: (analysis.detailed_analysis && analysis.detailed_analysis.joint_deviation_summary) || null
+                    };
+                } else if (analysis.supported === false) {
+                    console.warn('Session analysis not supported for this sport:', analysis.reason);
+                }
+            }
+        } catch (error) {
+            console.warn('Full-session analysis failed, using running averages instead:', error);
+        }
+    }
+
     try {
         const response = await fetchWithAuth(`${API_URL}/api/sessions/${currentSession.id}`, {
             method: 'PUT',
-            body: JSON.stringify({
-                end_time: new Date().toISOString(),
-                duration_minutes: durationMinutes,
-                is_completed: true,
-                performance_score: avgScore,
-                technique_accuracy: avgScore,
-                reaction_score: avgScore * 0.9,
-                balance_score: avgScore * 0.95
-            })
+            body: JSON.stringify(sessionUpdate)
         });
 
         if (!response.ok) throw new Error('Failed to update session');

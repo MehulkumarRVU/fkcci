@@ -63,6 +63,7 @@ class AthleteResponse(BaseModel):
     email: str
     username: str
     role: str
+    coach_id: Optional[int] = None
     sport_type: str
     linked_sports: List[str]
     skill_level: str
@@ -118,6 +119,7 @@ def athlete_to_response(athlete: Athlete) -> AthleteResponse:
         email=athlete.email,
         username=athlete.username,
         role=athlete.role,
+        coach_id=athlete.coach_id,
         sport_type=athlete.sport_type,
         linked_sports=linked_sports,
         skill_level=athlete.skill_level,

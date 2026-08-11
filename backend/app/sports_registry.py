@@ -43,10 +43,6 @@ SUPPORTED_SPORTS: Dict[str, Dict[str, str]] = {
     "swimming": {"name": "Swimming", "icon": "🏊"},
     "weight_lifting": {"name": "Weight Lifting", "icon": "🏋️"},
     "wwe": {"name": "WWE", "icon": "🤼"},
-    "mobility_training": {"name": "Mobility Training", "icon": "🦴"},
-    "rehabilitation": {"name": "Rehabilitation", "icon": "🩺"},
-    "home_workouts": {"name": "Home Workouts", "icon": "🏠"},
-    "calisthenics": {"name": "Calisthenics", "icon": "💪"},
 }
 
 VALID_SPORTS = set(SUPPORTED_SPORTS.keys())

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models.skill import Skill
+from ..models.skill_reference_pose import SkillReferencePose
 from ..dependencies import require_role
 from ..seed_data import seed_default_skills_if_empty
 
@@ -71,6 +72,33 @@ async def get_skill(skill_id: int, db: Session = Depends(get_db)):
         )
     
     return skill
+
+
+@router.get("/{skill_id}/reference-pose")
+async def get_skill_reference_pose(
+    skill_id: int,
+    skill_level: str = Query("beginner", description="beginner / intermediate / advanced"),
+    db: Session = Depends(get_db)
+):
+    """Documented ideal-form joint-angle ranges for a skill (Digital Twin
+    overlay). Live per-frame deviation classification doesn't read this
+    table - it reuses the analyzer's own thresholds directly - this is the
+    human-readable reference a coach UI can display."""
+    reference = (
+        db.query(SkillReferencePose)
+        .filter(SkillReferencePose.skill_id == skill_id, SkillReferencePose.skill_level == skill_level)
+        .first()
+    )
+    if not reference:
+        raise HTTPException(status_code=404, detail="No reference pose available for this skill/level yet")
+
+    return {
+        "skill_id": reference.skill_id,
+        "skill_level": reference.skill_level,
+        "checkpoint_name": reference.checkpoint_name,
+        "joint_angle_ranges": reference.joint_angle_ranges,
+        "notes": reference.notes,
+    }
 
 
 @router.post("/", response_model=SkillResponse, status_code=status.HTTP_201_CREATED)

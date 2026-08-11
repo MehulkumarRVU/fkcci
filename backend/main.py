@@ -5,7 +5,16 @@ import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_database
-from app.routes import auth_router, sessions_router, skills_router, analysis_router, analytics_router
+from app.routes import (
+    auth_router,
+    sessions_router,
+    skills_router,
+    analysis_router,
+    analytics_router,
+    gamification_router,
+    reports_router,
+    notes_router,
+)
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.config import settings
 
@@ -23,10 +32,10 @@ async def lifespan(app: FastAPI):
     if settings.ALGORITHM not in ("HS256", "HS384", "HS512"):
         print(f"WARNING: Unusual JWT algorithm configured: {settings.ALGORITHM}")
 
-    print("✅ Database initialized successfully")
+    print("[OK] Database initialized successfully")
     yield
 
-    print("✅ PocketCoach AI backend shutdown complete")
+    print("[OK] PocketCoach AI backend shutdown complete")
 
 
 # Initialize FastAPI app
@@ -55,6 +64,9 @@ app.include_router(sessions_router)
 app.include_router(skills_router)
 app.include_router(analysis_router)
 app.include_router(analytics_router)
+app.include_router(gamification_router)
+app.include_router(reports_router)
+app.include_router(notes_router)
 
 # Root endpoint
 @app.get("/")

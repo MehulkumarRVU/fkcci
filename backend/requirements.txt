@@ -12,3 +12,4 @@ mediapipe>=0.10.20
 numpy>=1.26.0
 redis>=4.6.0
 psycopg2-binary>=2.9.8
+reportlab>=4.2.0

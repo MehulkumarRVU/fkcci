@@ -29,22 +29,45 @@
             <a href="session.html" class="btn btn-primary btn-large">Start New Training Session</a>
         </div>
 
+        <!-- Gamification: streak + earned achievements -->
+        <div class="card" id="gamificationCard">
+            <div class="flex justify-between align-center">
+                <div>
+                    <h3 style="margin: 0;">🔥 <span id="streakValue">0</span>-day streak</h3>
+                    <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0;">Longest: <span id="longestStreakValue">0</span> days</p>
+                </div>
+            </div>
+            <div id="achievementsStrip" class="flex gap-2 mt-3" style="flex-wrap: wrap;"></div>
+        </div>
+
+        <!-- Notes from your coach - only shown when a coach is assigned -->
+        <div class="card hidden" id="coachNotesCard">
+            <h3 class="card-header">📝 Notes from Your Coach</h3>
+            <div id="dashboardNotesThread" class="notes-thread">
+                <p style="color: var(--text-secondary);">Loading notes...</p>
+            </div>
+            <div class="notes-composer">
+                <textarea id="dashboardNoteInput" class="form-textarea" placeholder="Reply to your coach..."></textarea>
+                <button id="dashboardNoteSendBtn" class="btn btn-primary">Send</button>
+            </div>
+        </div>
+
         <!-- Performance Stats -->
         <h2 class="mt-4 mb-3">Your Performance Overview</h2>
         <div class="stats-grid">
-            <div class="stat-card">
+            <div class="stat-card stat-card-primary">
                 <span class="stat-value" id="totalSessions">0</span>
                 <span class="stat-label">Total Sessions</span>
             </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, var(--secondary-color), #059669);">
+            <div class="stat-card stat-card-secondary">
                 <span class="stat-value" id="totalMinutes">0</span>
                 <span class="stat-label">Training Minutes</span>
             </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, var(--boxing-color), #7c3aed);">
+            <div class="stat-card stat-card-accent">
                 <span class="stat-value" id="avgPerformance">0</span>
                 <span class="stat-label">Avg Performance</span>
             </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, var(--table-tennis-color), #ff5722);">
+            <div class="stat-card stat-card-warning">
                 <span class="stat-value" id="avgTechnique">0</span>
                 <span class="stat-label">Avg Technique</span>
             </div>
@@ -82,186 +105,6 @@
     </div>
 
     <script src="../js/auth-utils.js"></script>
-    <script>
-        const API_URL = 'http://localhost:8080';
-        requireAuth();
-
-        // Logout functionality
-        document.getElementById('logoutBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            handleUnauthorized();
-        });
-
-        // Load dashboard data
-        async function loadDashboard() {
-            try {
-                const athlete = JSON.parse(localStorage.getItem('athlete'));
-                
-                // Show admin link for coaches
-                if (athlete && athlete.role === 'coach') {
-                    const adminLink = document.getElementById('adminLink');
-                    if (adminLink) {
-                        adminLink.style.display = 'block';
-                        console.log('✅ Admin link shown for coach');
-                    }
-                }
-                
-                // Display athlete info
-                if (!athlete) {
-                    window.location.href = 'login.html';
-                    return;
-                }
-                
-                document.getElementById('athleteName').textContent = athlete.username;
-                const sportDisplay = getSportDisplay(athlete.sport_type);
-                document.getElementById('athleteSport').textContent = sportDisplay;
-
-                // Load session stats
-                const statsResponse = await fetchWithAuth(`${API_URL}/api/sessions/stats/summary`);
-                if (!statsResponse.ok) {
-                    throw new Error('Failed to load session stats');
-                }
-                const stats = await statsResponse.json();
-
-                // Update stats
-                document.getElementById('totalSessions').textContent = stats.total_sessions;
-                document.getElementById('totalMinutes').textContent = stats.total_minutes;
-                document.getElementById('avgPerformance').textContent = stats.average_performance;
-                document.getElementById('avgTechnique').textContent = stats.average_technique;
-                document.getElementById('reactionScore').textContent = stats.average_reaction;
-                document.getElementById('balanceScore').textContent = stats.average_balance;
-
-                // Update progress bars
-                document.getElementById('reactionProgress').style.width = `${stats.average_reaction}%`;
-                document.getElementById('reactionProgress').textContent = `${stats.average_reaction}%`;
-                document.getElementById('balanceProgress').style.width = `${stats.average_balance}%`;
-                document.getElementById('balanceProgress').textContent = `${stats.average_balance}%`;
-
-                // Apply score colors
-                applyScoreColor('avgPerformance', stats.average_performance);
-                applyScoreColor('reactionScore', stats.average_reaction);
-                applyScoreColor('balanceScore', stats.average_balance);
-
-                // Load recent sessions
-                await loadRecentSessions();
-
-                // Load available skills
-                await loadAvailableSkills(athlete.sport_type);
-
-            } catch (error) {
-                console.error('Error loading dashboard:', error);
-            }
-        }
-
-        async function loadRecentSessions() {
-            try {
-                const response = await fetchWithAuth(`${API_URL}/api/sessions/?limit=5`);
-                if (!response.ok) {
-                    throw new Error('Failed to load sessions');
-                }
-                const sessions = await response.json();
-
-                const container = document.getElementById('recentSessions');
-                
-                if (sessions.length === 0) {
-                    container.innerHTML = '<div class="card"><p>No sessions yet. Start your first training session!</p></div>';
-                    return;
-                }
-
-                container.innerHTML = sessions.map(session => `
-                    <div class="card">
-                        <div class="flex justify-between align-center">
-                            <div>
-                                <h4>${getSportIcon(session.sport_type)} ${session.session_type.replace('_', ' ').toUpperCase()}</h4>
-                                <p style="color: var(--text-secondary);">${new Date(session.start_time).toLocaleDateString()} - ${session.duration_minutes} min</p>
-                            </div>
-                            <div class="text-right">
-                                <div class="score-display ${getScoreClass(session.performance_score)}" style="font-size: 2rem;">
-                                    ${session.performance_score}
-                                </div>
-                                <p style="font-size: 0.875rem; color: var(--text-secondary);">Performance</p>
-                            </div>
-                        </div>
-                        <div class="grid grid-3 gap-2 mt-2">
-                            <div>
-                                <strong>Technique:</strong> ${session.technique_accuracy}
-                            </div>
-                            <div>
-                                <strong>Reaction:</strong> ${session.reaction_score}
-                            </div>
-                            <div>
-                                <strong>Balance:</strong> ${session.balance_score}
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-
-            } catch (error) {
-                console.error('Error loading sessions:', error);
-                document.getElementById('recentSessions').innerHTML = 
-                    '<div class="alert alert-error">Failed to load sessions</div>';
-            }
-        }
-
-        async function loadAvailableSkills(sportType) {
-            try {
-                const response = await fetch(`${API_URL}/api/skills/?sport_type=${sportType}`);
-                const skills = await response.json();
-
-                const container = document.getElementById('availableSkills');
-                
-                container.innerHTML = skills.map(skill => `
-                    <div class="card">
-                        <h4>${skill.name}</h4>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem;">${skill.description || 'No description'}</p>
-                        <div class="mt-2">
-                            <span style="background-color: var(--light-bg); padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem;">
-                                ${skill.difficulty_level}
-                            </span>
-                            ${skill.primary_focus ? `
-                                <span style="background-color: var(--light-bg); padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; margin-left: 0.5rem;">
-                                    ${skill.primary_focus}
-                                </span>
-                            ` : ''}
-                        </div>
-                    </div>
-                `).join('');
-
-            } catch (error) {
-                console.error('Error loading skills:', error);
-            }
-        }
-
-        function applyScoreColor(elementId, score) {
-            const element = document.getElementById(elementId);
-            element.className = 'score-display ' + getScoreClass(score);
-        }
-
-        function getScoreClass(score) {
-            if (score >= 90) return 'excellent';
-            if (score >= 75) return 'good';
-            if (score >= 60) return 'average';
-            return 'poor';
-        }
-
-        function getSportDisplay(sportType) {
-            if (sportType === 'table_tennis') return '🏓 Table Tennis';
-            if (sportType === 'boxing') return '🥊 Boxing';
-            if (sportType === 'badminton') return '🏸 Badminton';
-            return sportType;
-        }
-
-        function getSportIcon(sportType) {
-            if (sportType === 'table_tennis') return '🏓';
-            if (sportType === 'boxing') return '🥊';
-            if (sportType === 'badminton') return '🏸';
-            return '🏅';
-        }
-
-    <script src="../js/auth-utils.js"></script>
-    <script>
-        // Load dashboard on page load
-        loadDashboard();
-    </script>
+    <script src="../js/dashboard.js"></script>
 </body>
 </html>

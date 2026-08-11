@@ -1,5 +1,10 @@
 from typing import Any, Dict, List
 from ..base_analyzer import BaseAnalyzer
+from ..shared.confidence import DEFAULT_GATE
+from ..shared.mirroring import get_dominant_and_off_side
+from ..shared.reference_compare import classify_deviation
+from ..shared.scoring import combine_scores
+from ..shared.skill_profiles import scale_penalty
 from ..shared.utils import PoseUtils
 
 
@@ -7,76 +12,82 @@ class TableTennisAnalyzer(BaseAnalyzer):
     def __init__(self):
         super().__init__(sport_type="table_tennis")
 
-    def analyze_frame(self, landmarks: List[Dict[str, float]], skill_name: str) -> Dict[str, Any]:
+    def analyze_frame(self, landmarks: List[Dict[str, float]], skill_name: str,
+                       skill_level: str = "beginner", dominant_hand: str = "right") -> Dict[str, Any]:
         feedback = []
         joint_angles = {}
         technique_score = 100.0
 
-        right_shoulder = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_SHOULDER"])
-        right_elbow = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_ELBOW"])
-        right_wrist = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_WRIST"])
-        right_hip = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_HIP"])
-        right_knee = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_KNEE"])
-        right_ankle = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_ANKLE"])
+        # Resolves to the athlete's actual playing arm instead of always
+        # reading the right side - a left-handed athlete's technique was
+        # previously scored using their non-dominant arm.
+        dom, _off, side = get_dominant_and_off_side(landmarks, dominant_hand)
+        L = PoseUtils.LANDMARKS
+        prefix = "LEFT" if side == "left" else "RIGHT"
+        deviations = {}
 
-        arm_angle = PoseUtils.calculate_angle(right_shoulder, right_elbow, right_wrist)
-        joint_angles["arm_extension"] = arm_angle
+        arm_angle = PoseUtils.calculate_angle_safe(dom.shoulder, dom.elbow, dom.wrist)
+        if arm_angle is not None:
+            joint_angles["arm_extension"] = arm_angle
         if "Drive" in skill_name or "Topspin" in skill_name:
-            if 130 <= arm_angle <= 170:
-                feedback.append("✅ Good arm extension.")
-            elif arm_angle < 130:
-                feedback.append("❌ Elbow too bent - extend more.")
-                technique_score -= 15.0
-            else:
-                feedback.append("⚠️ Arm too straight - slight bend needed.")
-                technique_score -= 10.0
+            delta, msg = self.check_range(
+                arm_angle, 130, 170, skill_level, penalty=10,
+                pass_msg="✅ Good arm extension.",
+                low_msg="❌ Elbow too bent - extend more.",
+                high_msg="⚠️ Arm too straight - slight bend needed.",
+                low_penalty=15, high_penalty=10,
+            )
+            technique_score += delta
+            if msg:
+                feedback.append(msg)
+            severity = classify_deviation(arm_angle, 130, 170)
+            if severity:
+                deviations[L[f"{prefix}_ELBOW"]] = severity
 
-        knee_angle = PoseUtils.calculate_angle(right_hip, right_knee, right_ankle)
-        joint_angles["knee_flexion"] = knee_angle
-        if 140 <= knee_angle <= 170:
-            feedback.append("✅ Good knee bend for stability.")
-        elif knee_angle < 140:
-            feedback.append("⚠️ Too much knee bend - raise up slightly.")
-            technique_score -= 10.0
-        else:
-            feedback.append("❌ Insufficient knee bend - lower your stance.")
-            technique_score -= 15.0
+        knee_angle = PoseUtils.calculate_angle_safe(dom.hip, dom.knee, dom.ankle)
+        if knee_angle is not None:
+            joint_angles["knee_flexion"] = knee_angle
+        delta, msg = self.check_range(
+            knee_angle, 140, 170, skill_level, penalty=10,
+            pass_msg="✅ Good knee bend for stability.",
+            low_msg="⚠️ Too much knee bend - raise up slightly.",
+            high_msg="❌ Insufficient knee bend - lower your stance.",
+            low_penalty=10, high_penalty=15,
+        )
+        technique_score += delta
+        if msg:
+            feedback.append(msg)
+        severity = classify_deviation(knee_angle, 140, 170)
+        if severity:
+            deviations[L[f"{prefix}_KNEE"]] = severity
 
-        if right_elbow["y"] > right_shoulder["y"] + 0.1:
-            feedback.append("❌ Elbow too low - keep it up.")
-            technique_score -= 15.0
+        if PoseUtils.is_confident(dom.elbow) and PoseUtils.is_confident(dom.shoulder):
+            if dom.elbow["y"] > dom.shoulder["y"] + 0.1:
+                feedback.append("❌ Elbow too low - keep it up.")
+                technique_score -= scale_penalty(15.0, skill_level)
 
-        if "Topspin" in skill_name:
-            if right_wrist["y"] < right_elbow["y"]:
+        if "Topspin" in skill_name and PoseUtils.is_confident(dom.wrist) and PoseUtils.is_confident(dom.elbow):
+            if dom.wrist["y"] < dom.elbow["y"]:
                 feedback.append("✅ Good wrist position for topspin.")
             else:
                 feedback.append("⚠️ Wrist should be higher than elbow for topspin.")
-                technique_score -= 10.0
+                technique_score -= scale_penalty(10.0, skill_level)
 
         balance_score, balance_feedback = PoseUtils.analyze_balance(landmarks)
         feedback.append(balance_feedback)
 
-        overall_score = max(0.0, technique_score * 0.7 + balance_score * 0.3)
-
-        return {
-            "score": overall_score,
-            "technique_accuracy": max(0.0, technique_score),
-            "balance_score": balance_score,
-            "feedback": feedback,
-            "joint_angles": joint_angles,
-        }
-
-    def analyze_session(self, pose_sequence: List[List[Dict[str, float]]], skill_name: str) -> Dict[str, Any]:
-        frame_results = [self.analyze_frame(frame, skill_name) for frame in pose_sequence]
-        avg_score = sum(r["score"] for r in frame_results) / len(frame_results) if frame_results else 0.0
-        avg_tech = sum(r["technique_accuracy"] for r in frame_results) / len(frame_results) if frame_results else 0.0
-        avg_balance = sum(r["balance_score"] for r in frame_results) / len(frame_results) if frame_results else 0.0
-        return {
-            "overall_score": round(avg_score, 2),
-            "technique_accuracy": round(avg_tech, 2),
-            "balance_score": round(avg_balance, 2),
-            "frame_count": len(frame_results),
-        }
+        breakdown = combine_scores(
+            technique_score=technique_score,
+            balance_score=balance_score,
+            technique_weight=0.7,
+            pose_confidence=DEFAULT_GATE.coverage(landmarks),
+            feedback=feedback,
+            joint_angles=joint_angles,
+        )
+        result = breakdown.as_dict()
+        result["dominant_side_used"] = side
+        result["deviations"] = deviations
+        return result
 
     def get_supported_skills(self) -> List[str]:
         return [

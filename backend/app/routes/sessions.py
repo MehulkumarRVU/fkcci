@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.session import Session as SessionModel
 from ..models.athlete import Athlete
+from ..services.gamification_service import update_streak, check_and_award_achievements
 from .auth import get_current_athlete
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
@@ -16,6 +17,7 @@ router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 class SessionCreate(BaseModel):
     sport_type: str
     session_type: str  # drill / sparring / shadow / match_simulation
+    skill_name: Optional[str] = None
 
 
 class SessionUpdate(BaseModel):
@@ -27,6 +29,8 @@ class SessionUpdate(BaseModel):
     reaction_score: Optional[float] = None
     balance_score: Optional[float] = None
     session_data: Optional[dict] = None
+    scoring_version: Optional[str] = None
+    joint_summary: Optional[dict] = None
 
 
 class SessionResponse(BaseModel):
@@ -34,15 +38,18 @@ class SessionResponse(BaseModel):
     athlete_id: int
     sport_type: str
     session_type: str
+    skill_name: Optional[str] = None
     start_time: datetime
     end_time: Optional[datetime]
     duration_minutes: int
     is_completed: bool
     performance_score: float
     technique_accuracy: float
-    reaction_score: float
+    reaction_score: Optional[float] = None
     balance_score: float
     session_data: Optional[dict]
+    scoring_version: Optional[str] = None
+    joint_summary: Optional[dict] = None
     created_at: datetime
 
     class Config:
@@ -77,7 +84,8 @@ async def create_session(
     new_session = SessionModel(
         athlete_id=current_athlete.id,
         sport_type=session_data.sport_type,
-        session_type=session_data.session_type
+        session_type=session_data.session_type,
+        skill_name=session_data.skill_name
     )
     
     db.add(new_session)
@@ -154,13 +162,20 @@ async def update_session(
             detail="Not authorized to update this session"
         )
     
+    # Capture completion state BEFORE applying the update - the field-update
+    # loop below sets session.is_completed to the new value, so checking
+    # session.is_completed afterward would always see it already True and
+    # this whole block (total_sessions/performance_rating/gamification)
+    # would silently never fire on a real completion.
+    was_already_completed = session.is_completed
+
     # Update fields
     update_data = session_update.dict(exclude_unset=True)
     for key, value in update_data.items():
         setattr(session, key, value)
-    
+
     # If session is completed, update athlete stats
-    if session_update.is_completed and not session.is_completed:
+    if session_update.is_completed and not was_already_completed:
         current_athlete.total_sessions += 1
         
         # Update performance rating (weighted average)
@@ -173,7 +188,14 @@ async def update_session(
             )
         
         current_athlete.updated_at = datetime.utcnow()
-    
+
+        # Gamification: streak + achievements update on the same
+        # is_completed transition total_sessions/performance_rating already
+        # use, so this fires exactly once per real completion.
+        session_day = (session.start_time or datetime.utcnow()).date()
+        update_streak(current_athlete, session_day)
+        check_and_award_achievements(current_athlete, db, session)
+
     db.commit()
     db.refresh(session)
     
@@ -232,14 +254,18 @@ async def get_session_stats(
     total_minutes = sum(s.duration_minutes for s in sessions)
     avg_performance = sum(s.performance_score for s in sessions) / len(sessions)
     avg_technique = sum(s.technique_accuracy for s in sessions) / len(sessions)
-    avg_reaction = sum(s.reaction_score for s in sessions) / len(sessions)
+    # reaction_score is nullable (honest "not measured" instead of a
+    # fabricated number) - average only over sessions where it was actually
+    # measured rather than crashing or silently treating None as 0.
+    measured_reactions = [s.reaction_score for s in sessions if s.reaction_score is not None]
+    avg_reaction = sum(measured_reactions) / len(measured_reactions) if measured_reactions else None
     avg_balance = sum(s.balance_score for s in sessions) / len(sessions)
-    
+
     return {
         "total_sessions": len(sessions),
         "total_minutes": total_minutes,
         "average_performance": round(avg_performance, 2),
         "average_technique": round(avg_technique, 2),
-        "average_reaction": round(avg_reaction, 2),
+        "average_reaction": round(avg_reaction, 2) if avg_reaction is not None else None,
         "average_balance": round(avg_balance, 2)
     }

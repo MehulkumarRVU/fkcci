@@ -85,7 +85,28 @@ function requireAuth() {
     return true;
 }
 
+// Downloads a protected (auth-required) file, e.g. a PDF report. A plain
+// <a href> can't carry the Authorization header these endpoints need, so
+// this fetches the response as a Blob and triggers the download via a
+// temporary object URL instead.
+async function downloadFile(url, filename) {
+    const response = await fetchWithAuth(url);
+    if (!response.ok) {
+        throw new Error(`Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+}
+
 window.getAuthToken = getAuthToken;
 window.fetchWithAuth = fetchWithAuth;
 window.handleUnauthorized = handleUnauthorized;
 window.requireAuth = requireAuth;
+window.downloadFile = downloadFile;

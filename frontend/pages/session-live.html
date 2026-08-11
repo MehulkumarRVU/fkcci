@@ -44,6 +44,7 @@
                     <div class="video-container">
                         <video id="webcam" autoplay playsinline muted></video>
                         <canvas id="poseCanvas" class="video-canvas"></canvas>
+                        <div id="skeleton3dContainer" style="display:none; width:100%; height:100%;"></div>
                     </div>
 
                     <div class="card mt-3">
@@ -55,6 +56,11 @@
                                 <span style="font-weight: 500;">FPS: </span>
                                 <span id="fpsDisplay">0</span>
                             </div>
+                        </div>
+                        <div class="flex justify-center align-center mt-2">
+                            <button id="toggle3dBtn" class="btn btn-secondary" style="width: 100%;">
+                                🧍 Show Digital Twin (3D Skeleton)
+                            </button>
                         </div>
                     </div>
 
@@ -169,8 +175,10 @@
             }
         });
     </script>
+    <script src="../js/pose-thresholds.js"></script>
     <script src="../js/pose-detection.js"></script>
     <script src="../js/sports-analyzer.js"></script>
+    <script src="../js/skeleton-3d.js"></script>
     <script src="../js/auth-utils.js"></script>
     <script src="../js/session-live.js"></script>
 </body>

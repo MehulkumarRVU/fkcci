@@ -19,6 +19,17 @@ document.addEventListener('DOMContentLoaded', () => {
     currentCoach = athlete;
     loadCoachSummary();
     loadAthletes();
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        // Previously an inline onclick="logout()" called a function that
+        // was never defined anywhere in the app - the button silently did
+        // nothing. Wired to the same working pattern every other page uses.
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleUnauthorized();
+        });
+    }
 });
 
 /**
@@ -236,8 +247,11 @@ function displayAthleteDetails(report) {
     const html = `
         <!-- Profile Section -->
         <div class="detail-section">
-            <h3>👤 Athlete Profile</h3>
-            <div class="stats-grid">
+            <div class="flex justify-between align-center">
+                <h3 style="margin: 0; border: none; padding: 0;">👤 Athlete Profile</h3>
+                <button class="btn btn-outline btn-small" onclick="downloadCoachReportPdf(${report.athlete_id}, '${report.athlete_username}')">📄 Download PDF</button>
+            </div>
+            <div class="stats-grid" style="margin-top: 15px;">
                 <div class="stat-box">
                     <label>Skill Level</label>
                     <value>${report.skill_level}</value>
@@ -286,7 +300,7 @@ function displayAthleteDetails(report) {
                 </div>
                 <div class="stat-box">
                     <label>Reaction Score</label>
-                    <value>${stats.avg_reaction_score.toFixed(1)}%</value>
+                    <value>${stats.avg_reaction_score !== null && stats.avg_reaction_score !== undefined ? stats.avg_reaction_score.toFixed(1) + '%' : 'N/A'}</value>
                 </div>
                 <div class="stat-box">
                     <label>Balance Score</label>
@@ -363,9 +377,84 @@ function displayAthleteDetails(report) {
                 ${generateCoachingFeedback(stats)}
             </div>
         </div>
+
+        <!-- Coach Notes Section -->
+        <div class="detail-section">
+            <h3>📝 Coach Notes</h3>
+            <div id="notesThread" class="notes-thread">
+                <p style="color: var(--text-secondary);">Loading notes...</p>
+            </div>
+            <div class="notes-composer">
+                <textarea id="noteComposerInput" class="form-textarea" placeholder="Leave a note for this athlete..."></textarea>
+                <button id="noteComposerSendBtn" class="btn btn-primary">Send</button>
+            </div>
+        </div>
     `;
 
     document.getElementById('modalBody').innerHTML = html;
+    loadNotesForModal(report.athlete_id);
+}
+
+/**
+ * Load and render the coach<->athlete notes thread inside the currently
+ * open detail modal, and wire the composer's send button.
+ */
+async function loadNotesForModal(athleteId) {
+    const threadEl = document.getElementById('notesThread');
+    const sendBtn = document.getElementById('noteComposerSendBtn');
+    const input = document.getElementById('noteComposerInput');
+    if (!threadEl) return;
+
+    async function refresh() {
+        try {
+            const response = await fetchWithAuth(`${API_BASE_URL}/notes/athlete/${athleteId}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const notes = await response.json();
+
+            threadEl.innerHTML = notes.length === 0
+                ? '<p style="color: var(--text-secondary);">No notes yet - start the conversation below.</p>'
+                : notes.map(n => `
+                    <div class="note-bubble ${n.is_coach ? 'from-coach' : 'from-athlete'}">
+                        <div class="note-meta">${n.author_username} (${n.is_coach ? 'Coach' : 'Athlete'}) - ${new Date(n.created_at).toLocaleString()}</div>
+                        <div class="note-message"></div>
+                    </div>
+                `).join('');
+
+            // Set message text via textContent (not template interpolation)
+            // to avoid rendering athlete/coach-authored note content as HTML.
+            const bubbles = threadEl.querySelectorAll('.note-message');
+            notes.forEach((n, i) => { if (bubbles[i]) bubbles[i].textContent = n.message; });
+
+            threadEl.scrollTop = threadEl.scrollHeight;
+        } catch (error) {
+            console.error('Error loading notes:', error);
+            threadEl.innerHTML = '<p style="color: var(--danger-color);">Failed to load notes.</p>';
+        }
+    }
+
+    if (sendBtn) {
+        sendBtn.onclick = async () => {
+            const message = input.value.trim();
+            if (!message) return;
+            sendBtn.disabled = true;
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/notes/athlete/${athleteId}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ message }),
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                input.value = '';
+                await refresh();
+            } catch (error) {
+                console.error('Error posting note:', error);
+                showAlert('Failed to send note', 'error');
+            } finally {
+                sendBtn.disabled = false;
+            }
+        };
+    }
+
+    await refresh();
 }
 
 /**
@@ -459,3 +548,16 @@ document.addEventListener('click', (e) => {
         closeModal();
     }
 });
+
+/**
+ * Download a coach's PDF report for one athlete (referenced via inline
+ * onclick from the athlete detail modal - see displayAthleteDetails).
+ */
+async function downloadCoachReportPdf(athleteId, username) {
+    try {
+        await downloadFile(`${API_BASE_URL}/reports/coach/athlete/${athleteId}/pdf`, `${username}_coach_report.pdf`);
+    } catch (error) {
+        console.error('Error downloading coach report:', error);
+        showAlert('Failed to download report', 'error');
+    }
+}

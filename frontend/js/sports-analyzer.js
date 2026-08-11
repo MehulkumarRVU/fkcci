@@ -2,11 +2,42 @@
 // Provides basic angle calculations and feedback formatting
 
 class SportsAnalyzer {
-    constructor(sportType, sessionType = 'drill') {
+    constructor(sportType, sessionType = 'drill', dominantHand = 'right', skillLevel = 'beginner') {
         this.sportType = sportType;
         this.sessionType = sessionType;
+        this.dominantHand = (dominantHand || 'right').toLowerCase() === 'left' ? 'left' : 'right';
+        this.skillLevel = skillLevel || 'beginner';
         this.feedbackHistory = [];
         this.scoreHistory = [];
+        this.techniqueHistory = [];
+        this.balanceHistory = [];
+        // Downsampled {landmarks, timestamp} buffer sent to
+        // /api/analysis/analyze at session end for real, backend-computed
+        // technique/balance/reaction scores instead of a client-only average.
+        this.poseBuffer = [];
+        this.lastBufferedAt = 0;
+        this.bufferIntervalMs = 500;
+        this.maxBufferSize = 600;
+    }
+
+    // Dominant-side landmark indices (MediaPipe Pose layout).
+    dominantIndices() {
+        return this.dominantHand === 'left'
+            ? { shoulder: 11, elbow: 13, wrist: 15 }
+            : { shoulder: 12, elbow: 14, wrist: 16 };
+    }
+
+    addPoseSample(landmarksArray, timestamp) {
+        if (timestamp - this.lastBufferedAt < this.bufferIntervalMs) return;
+        this.lastBufferedAt = timestamp;
+        this.poseBuffer.push({ landmarks: landmarksArray, timestamp: timestamp / 1000 });
+        if (this.poseBuffer.length > this.maxBufferSize) {
+            this.poseBuffer.shift();
+        }
+    }
+
+    getPoseBuffer() {
+        return this.poseBuffer;
     }
 
     calculateAngle(a, b, c) {
@@ -43,19 +74,25 @@ class SportsAnalyzer {
             score -= 20;
         }
 
-        // Check balance (ankle width)
+        // Check balance (ankle width relative to hip width - mirrors backend
+        // PoseUtils.analyze_balance so client and server feedback agree)
         const leftAnkle = landmarks[27];
         const rightAnkle = landmarks[28];
-        
-        if (leftAnkle && rightAnkle && 
-            leftAnkle.visibility > 0.5 && rightAnkle.visibility > 0.5) {
-            
-            const stanceWidth = Math.abs(leftAnkle.x - rightAnkle.x);
-            
-            if (stanceWidth < 0.1) {
+        const leftHip = landmarks[23];
+        const rightHip = landmarks[24];
+
+        if (leftAnkle && rightAnkle && leftHip && rightHip &&
+            leftAnkle.visibility > 0.5 && rightAnkle.visibility > 0.5 &&
+            leftHip.visibility > 0.5 && rightHip.visibility > 0.5) {
+
+            const ankleWidth = Math.abs(leftAnkle.x - rightAnkle.x);
+            const hipWidth = Math.abs(leftHip.x - rightHip.x);
+            const bal = (typeof PoseThresholds !== 'undefined') ? PoseThresholds.balance : { narrowRatio: 0.8, wideRatio: 2.0 };
+
+            if (hipWidth > 0 && ankleWidth < hipWidth * bal.narrowRatio) {
                 feedback.push('⚠️ Widen your stance for better balance');
                 score -= 10;
-            } else if (stanceWidth > 0.4) {
+            } else if (hipWidth > 0 && ankleWidth > hipWidth * bal.wideRatio) {
                 feedback.push('⚠️ Stance too wide - bring feet closer');
                 score -= 10;
             } else {
@@ -63,11 +100,14 @@ class SportsAnalyzer {
             }
         }
 
-        // Sport-specific checks
+        // Sport-specific checks. motogp/formula1 are intentionally excluded -
+        // seated/helmeted/vehicle-occluded activities aren't assessable via
+        // webcam pose analysis (mirrors backend AnalyzerFactory.NOT_POSE_COACHABLE).
         const racketSports = ['table_tennis', 'badminton', 'tennis', 'pickleball', 'squash'];
-        const combatSports = ['boxing', 'kickboxing', 'muay_thai', 'karate', 'taekwondo', 'judo', 'bjj', 'wrestling', 'fencing'];
-        const courtSports = ['basketball', 'volleyball', 'handball'];
-        const fitnessSports = ['ai_gym_coach', 'stretching', 'mobility_training', 'rehabilitation', 'home_workouts', 'calisthenics'];
+        const combatSports = ['boxing', 'kickboxing', 'muay_thai', 'karate', 'taekwondo', 'judo', 'bjj', 'wrestling', 'fencing', 'kabaddi', 'wwe'];
+        const courtSports = ['basketball', 'volleyball', 'handball', 'football', 'baseball', 'cricket', 'hockey', 'ice_hockey'];
+        const archerySports = ['indoor_archery', 'shooting'];
+        const fitnessSports = ['ai_gym_coach', 'weight_lifting', 'stretching', 'mobility_training', 'rehabilitation', 'home_workouts', 'calisthenics', 'gymnastics', 'swimming'];
 
         if (this.sportType === 'boxing') {
             this.analyzeBoxingLocal(landmarks, skillName, feedback);
@@ -81,7 +121,7 @@ class SportsAnalyzer {
             this.analyzeCombatLocal(landmarks, skillName, feedback);
         } else if (courtSports.includes(this.sportType)) {
             this.analyzeCourtLocal(landmarks, skillName, feedback);
-        } else if (this.sportType === 'indoor_archery') {
+        } else if (archerySports.includes(this.sportType)) {
             this.analyzeArcheryLocal(landmarks, skillName, feedback);
         } else if (fitnessSports.includes(this.sportType)) {
             this.analyzeFitnessLocal(landmarks, skillName, feedback);
@@ -122,24 +162,27 @@ class SportsAnalyzer {
             leftHip.visibility > 0.5 && leftKnee.visibility > 0.5 && leftAnkle.visibility > 0.5) {
             
             const kneeAngle = this.calculateAngle(leftHip, leftKnee, leftAnkle);
-            
-            if (kneeAngle > 170) {
+            const t = (typeof PoseThresholds !== 'undefined') ? PoseThresholds.tableTennis.kneeFlexion : { high: 170 };
+
+            if (kneeAngle > t.high) {
                 feedback.push('⚠️ Bend your knees more for better reaction');
             }
         }
     }
 
     analyzeBadmintonLocal(landmarks, skillName, feedback) {
-        const leftWrist = landmarks[15];
-        const rightWrist = landmarks[16];
-        const leftElbow = landmarks[13];
-        const rightElbow = landmarks[14];
+        // Racket arm resolved from the athlete's dominant hand instead of a
+        // hardcoded side.
+        const idx = this.dominantIndices();
+        const shoulder = landmarks[idx.shoulder];
+        const elbow = landmarks[idx.elbow];
+        const wrist = landmarks[idx.wrist];
+        const t = (typeof PoseThresholds !== 'undefined') ? PoseThresholds.badminton : { armExtensionOk: 140 };
 
-        if (leftWrist && rightWrist && leftElbow && rightElbow) {
+        if (shoulder && elbow && wrist) {
             if (skillName.toLowerCase().includes('smash') || skillName.toLowerCase().includes('clear')) {
-                const leftArmAngle = this.calculateAngle(landmarks[11], leftElbow, leftWrist);
-                const rightArmAngle = this.calculateAngle(landmarks[12], rightElbow, rightWrist);
-                if (leftArmAngle < 140 && rightArmAngle < 140) {
+                const armAngle = this.calculateAngle(shoulder, elbow, wrist);
+                if (armAngle >= (t.armExtensionOk || 130)) {
                     feedback.push('✅ Good racket extension for powerful badminton shots');
                 } else {
                     feedback.push('⚠️ Extend your arm more for better shuttle contact');
@@ -147,7 +190,7 @@ class SportsAnalyzer {
             }
 
             if (skillName.toLowerCase().includes('net') || skillName.toLowerCase().includes('drop')) {
-                if (rightWrist && rightElbow && rightWrist.y < rightElbow.y) {
+                if (wrist.y < elbow.y) {
                     feedback.push('✅ Nice wrist control for delicate net play');
                 } else {
                     feedback.push('⚠️ Keep your racket hand higher for net precision');
@@ -238,6 +281,48 @@ class SportsAnalyzer {
                 feedback.push('✅ Good torso posture');
             }
         }
+    }
+
+    // Appends a session-type-specific reminder. This was previously called
+    // from analyzeLocally() but never defined, which threw on every frame
+    // and silently broke live scoring/feedback entirely.
+    applySessionTypeFocus(landmarks, skillName, feedback) {
+        const hints = {
+            drill: '🎯 Drill focus: repeat the motion cleanly, prioritize form over speed.',
+            shadow: '🕺 Shadow focus: keep balance and control without impact.',
+            sparring: '⚡ Sparring focus: watch your guard and reaction timing.',
+            match_simulation: '🏆 Match focus: keep intensity and pacing realistic.'
+        };
+        const hint = hints[this.sessionType];
+        if (hint) {
+            feedback.push(hint);
+        }
+    }
+
+    // Records a server-computed analysis result so session-end aggregates
+    // (technique/balance) reflect real, independently measured values
+    // instead of derivatives of a single local score.
+    addServerResult(analysis) {
+        if (typeof analysis.technique_accuracy === 'number') {
+            this.techniqueHistory.push(analysis.technique_accuracy);
+            if (this.techniqueHistory.length > 100) this.techniqueHistory.shift();
+        }
+        if (typeof analysis.balance_score === 'number') {
+            this.balanceHistory.push(analysis.balance_score);
+            if (this.balanceHistory.length > 100) this.balanceHistory.shift();
+        }
+    }
+
+    getAverageTechnique() {
+        if (this.techniqueHistory.length === 0) return null;
+        const sum = this.techniqueHistory.reduce((a, b) => a + b, 0);
+        return Math.round(sum / this.techniqueHistory.length);
+    }
+
+    getAverageBalance() {
+        if (this.balanceHistory.length === 0) return null;
+        const sum = this.balanceHistory.reduce((a, b) => a + b, 0);
+        return Math.round(sum / this.balanceHistory.length);
     }
 
     addFeedback(feedback, score) {

@@ -1,5 +1,7 @@
 from typing import Any, Dict, List
 from ..base_analyzer import BaseAnalyzer
+from ..shared.mirroring import get_dominant_and_off_side
+from ..shared.skill_profiles import effective_min, scale_penalty
 from ..shared.utils import PoseUtils
 
 
@@ -7,96 +9,86 @@ class TennisAnalyzer(BaseAnalyzer):
     def __init__(self):
         super().__init__(sport_type="tennis")
 
-    def analyze_frame(self, landmarks: List[Dict[str, float]], skill_name: str) -> Dict[str, Any]:
+    def analyze_frame(self, landmarks: List[Dict[str, float]], skill_name: str,
+                       skill_level: str = "beginner", dominant_hand: str = "right") -> Dict[str, Any]:
         feedback = []
         technique_score = 100.0
 
-        # Use right-side landmarks for racket hand; fall back to left if visibility low
         rs = PoseUtils.LANDMARKS
-        right_shoulder = PoseUtils.get_landmark(landmarks, rs["RIGHT_SHOULDER"])
-        right_elbow = PoseUtils.get_landmark(landmarks, rs["RIGHT_ELBOW"])
-        right_wrist = PoseUtils.get_landmark(landmarks, rs["RIGHT_WRIST"])
-        left_shoulder = PoseUtils.get_landmark(landmarks, rs["LEFT_SHOULDER"])
-        left_elbow = PoseUtils.get_landmark(landmarks, rs["LEFT_ELBOW"])
-        left_wrist = PoseUtils.get_landmark(landmarks, rs["LEFT_WRIST"])
         nose = PoseUtils.get_landmark(landmarks, rs["NOSE"])
-        left_hip = PoseUtils.get_landmark(landmarks, rs["LEFT_HIP"])
-        right_hip = PoseUtils.get_landmark(landmarks, rs["RIGHT_HIP"])
-        left_knee = PoseUtils.get_landmark(landmarks, rs["LEFT_KNEE"])
-        right_knee = PoseUtils.get_landmark(landmarks, rs["RIGHT_KNEE"])
+        left_shoulder = PoseUtils.get_landmark(landmarks, rs["LEFT_SHOULDER"])
+        right_shoulder = PoseUtils.get_landmark(landmarks, rs["RIGHT_SHOULDER"])
 
-        # Detect dominant side by wrist visibility/x position
-        dominant = "right" if right_wrist.get("visibility", 0) >= left_wrist.get("visibility", 0) else "left"
+        # Racket arm resolved from Athlete.dominant_hand instead of a
+        # per-frame visibility guess (which could flip side frame-to-frame).
+        dom, _off, _side = get_dominant_and_off_side(landmarks, dominant_hand)
 
         # Serve practice checks
         if "Serve" in skill_name or skill_name.lower().startswith("serve"):
-            # Toss alignment: nose roughly above front foot / between shoulders
-            mid_shoulder_x = (left_shoulder["x"] + right_shoulder["x"]) / 2
-            if abs(nose["x"] - mid_shoulder_x) < 0.07:
-                feedback.append("✅ Good toss alignment under control.")
-            else:
-                feedback.append("⚠️ Toss alignment off - try to toss vertically in front of your body.")
-                technique_score -= 10.0
+            if PoseUtils.is_confident(nose) and PoseUtils.is_confident(left_shoulder) and PoseUtils.is_confident(right_shoulder):
+                mid_shoulder_x = (left_shoulder["x"] + right_shoulder["x"]) / 2
+                delta, msg = self.check_max(
+                    abs(nose["x"] - mid_shoulder_x), 0.07, skill_level, penalty=10,
+                    pass_msg="✅ Good toss alignment under control.",
+                    fail_msg="⚠️ Toss alignment off - try to toss vertically in front of your body.",
+                )
+                technique_score += delta
+                feedback.append(msg)
 
-            # Racket ready position: elbow up and wrist near shoulder height
-            shoulder = right_shoulder if dominant == "right" else left_shoulder
-            elbow = right_elbow if dominant == "right" else left_elbow
-            wrist = right_wrist if dominant == "right" else left_wrist
-            elb_angle = PoseUtils.calculate_angle(shoulder, elbow, wrist)
-            if 70 <= elb_angle <= 120:
-                feedback.append("✅ Ready racket position for serve.")
-            else:
-                feedback.append("⚠️ Adjust racket preparation - elbow angle should be ~90°.")
-                technique_score -= 8.0
+            elb_angle = PoseUtils.calculate_angle_safe(dom.shoulder, dom.elbow, dom.wrist)
+            delta, msg = self.check_range(
+                elb_angle, 70, 120, skill_level, penalty=8,
+                pass_msg="✅ Ready racket position for serve.",
+                low_msg="⚠️ Adjust racket preparation - elbow angle should be ~90°.",
+                high_msg="⚠️ Adjust racket preparation - elbow angle should be ~90°.",
+            )
+            technique_score += delta
+            if msg:
+                feedback.append(msg)
 
         # Forehand/backhand stroke checks
         if "Forehand" in skill_name or "Backhand" in skill_name:
-            shoulder = right_shoulder if dominant == "right" else left_shoulder
-            elbow = right_elbow if dominant == "right" else left_elbow
-            wrist = right_wrist if dominant == "right" else left_wrist
-            arm_angle = PoseUtils.calculate_angle(shoulder, elbow, wrist)
-            if arm_angle >= 135:
-                feedback.append("✅ Good arm extension through contact.")
-            elif arm_angle >= 110:
-                feedback.append("⚠️ Slightly limited extension - follow through more.")
-                technique_score -= 6.0
-            else:
-                feedback.append("❌ Limited extension - extend arm more for power.")
-                technique_score -= 15.0
+            arm_angle = PoseUtils.calculate_angle_safe(dom.shoulder, dom.elbow, dom.wrist)
+            if arm_angle is not None:
+                good_threshold = effective_min(135, skill_level)
+                ok_threshold = effective_min(110, skill_level)
+                if arm_angle >= good_threshold:
+                    feedback.append("✅ Good arm extension through contact.")
+                elif arm_angle >= ok_threshold:
+                    feedback.append("⚠️ Slightly limited extension - follow through more.")
+                    technique_score -= scale_penalty(6.0, skill_level)
+                else:
+                    feedback.append("❌ Limited extension - extend arm more for power.")
+                    technique_score -= scale_penalty(15.0, skill_level)
 
         # Footwork & weight transfer hints
-        hip_diff = abs(left_hip["x"] - right_hip["x"])
-        knee_diff = abs(left_knee["y"] - right_knee["y"])
-        if hip_diff > 0.12:
-            feedback.append("✅ Good weight shift across hips.")
-        else:
-            feedback.append("⚠️ Increase weight transfer for more power.")
-            technique_score -= 6.0
+        if PoseUtils.is_confident(dom.hip) and PoseUtils.is_confident(_off.hip):
+            hip_diff = abs(dom.hip["x"] - _off.hip["x"])
+            delta, msg = self.check_min(
+                hip_diff, 0.12, skill_level, penalty=6,
+                pass_msg="✅ Good weight shift across hips.",
+                fail_msg="⚠️ Increase weight transfer for more power.",
+            )
+            technique_score += delta
+            feedback.append(msg)
 
-        if knee_diff > 0.06:
-            feedback.append("⚠️ Uneven knee heights - check landing and balance.")
-            technique_score -= 4.0
+        if PoseUtils.is_confident(dom.knee) and PoseUtils.is_confident(_off.knee):
+            knee_diff = abs(dom.knee["y"] - _off.knee["y"])
+            if knee_diff > 0.06:
+                feedback.append("⚠️ Uneven knee heights - check landing and balance.")
+                technique_score -= scale_penalty(4.0, skill_level)
 
         balance_score, balance_feedback = PoseUtils.analyze_balance(landmarks)
         feedback.append(balance_feedback)
 
-        overall_score = max(0.0, technique_score * 0.65 + balance_score * 0.35)
+        technique_score = max(0.0, technique_score)
+        overall_score = self.blend_scores(technique_score, balance_score, 0.65)
 
         return {
             "score": overall_score,
-            "technique_accuracy": max(0.0, technique_score),
+            "technique_accuracy": technique_score,
             "balance_score": balance_score,
             "feedback": feedback,
-        }
-
-    def analyze_session(self, pose_sequence: List[List[Dict[str, float]]], skill_name: str) -> Dict[str, Any]:
-        frame_results = [self.analyze_frame(frame, skill_name) for frame in pose_sequence]
-        avg_score = sum(r["score"] for r in frame_results) / len(frame_results) if frame_results else 0.0
-        return {
-            "overall_score": round(avg_score, 2),
-            "technique_accuracy": round(sum(r["technique_accuracy"] for r in frame_results) / len(frame_results), 2) if frame_results else 0.0,
-            "balance_score": round(sum(r["balance_score"] for r in frame_results) / len(frame_results), 2) if frame_results else 0.0,
-            "frame_count": len(frame_results),
         }
 
     def get_supported_skills(self) -> List[str]:

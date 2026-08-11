@@ -6,6 +6,59 @@ requireAuth();
 // Global variables
 let athlete = null;
 
+// Session type options tailored per sport family - previously the dropdown
+// offered the same 4 generic options (including "Sparring") regardless of
+// sport, which made no sense for e.g. table tennis or archery.
+const SESSION_TYPE_OPTIONS = {
+    combat: [
+        { value: 'drill', label: 'Drill Practice' },
+        { value: 'shadow', label: 'Shadow Training' },
+        { value: 'sparring', label: 'Sparring' },
+        { value: 'match_simulation', label: 'Match Simulation' }
+    ],
+    racket: [
+        { value: 'drill', label: 'Drill Practice' },
+        { value: 'shadow', label: 'Shadow Practice (No Ball)' },
+        { value: 'match_simulation', label: 'Match Play' }
+    ],
+    court: [
+        { value: 'drill', label: 'Drill Practice' },
+        { value: 'shadow', label: 'Shadow Practice' },
+        { value: 'match_simulation', label: 'Game Simulation' }
+    ],
+    precision: [
+        { value: 'drill', label: 'Technique Drill' },
+        { value: 'match_simulation', label: 'Scoring Round' }
+    ],
+    fitness: [
+        { value: 'drill', label: 'Form Practice' },
+        { value: 'shadow', label: 'Light / Recovery Session' },
+        { value: 'match_simulation', label: 'Full Intensity Workout' }
+    ]
+};
+
+const SPORT_FAMILY = {
+    table_tennis: 'racket', badminton: 'racket', tennis: 'racket', pickleball: 'racket', squash: 'racket',
+    boxing: 'combat', kickboxing: 'combat', muay_thai: 'combat', karate: 'combat', taekwondo: 'combat',
+    judo: 'combat', bjj: 'combat', wrestling: 'combat', fencing: 'combat', kabaddi: 'combat', wwe: 'combat',
+    basketball: 'court', volleyball: 'court', handball: 'court', football: 'court', baseball: 'court',
+    cricket: 'court', hockey: 'court', ice_hockey: 'court',
+    indoor_archery: 'precision', shooting: 'precision',
+    ai_gym_coach: 'fitness', weight_lifting: 'fitness', stretching: 'fitness', mobility_training: 'fitness',
+    rehabilitation: 'fitness', home_workouts: 'fitness', calisthenics: 'fitness', gymnastics: 'fitness', swimming: 'fitness'
+};
+
+function populateSessionTypeOptions(sportType) {
+    const select = document.getElementById('sessionType');
+    if (!select) return;
+
+    const family = SPORT_FAMILY[sportType] || 'court';
+    const options = SESSION_TYPE_OPTIONS[family] || SESSION_TYPE_OPTIONS.court;
+
+    select.innerHTML = '<option value="">Select session type...</option>' +
+        options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+}
+
 // Initialize
 async function init() {
     athlete = JSON.parse(localStorage.getItem('athlete'));
@@ -30,6 +83,8 @@ async function init() {
         window.location.href = 'login.html';
         return;
     }
+
+    populateSessionTypeOptions(athlete.sport_type);
 
     // Setup logout button
     const logoutBtn = document.getElementById('logoutBtn');
@@ -158,7 +213,8 @@ async function startSession(e) {
             method: 'POST',
             body: JSON.stringify({
                 sport_type: athlete.sport_type,
-                session_type: sessionType
+                session_type: sessionType,
+                skill_name: selectedSkill.name
             })
         });
 

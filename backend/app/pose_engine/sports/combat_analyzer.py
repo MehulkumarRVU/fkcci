@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 from ..base_analyzer import BaseAnalyzer
+from ..shared.thresholds import scale_penalty
 from ..shared.utils import PoseUtils
 
 
@@ -7,7 +8,8 @@ class CombatAnalyzer(BaseAnalyzer):
     def __init__(self, sport_type: str = "combat"):
         super().__init__(sport_type=sport_type)
 
-    def analyze_frame(self, landmarks: List[Dict[str, float]], skill_name: str) -> Dict[str, Any]:
+    def analyze_frame(self, landmarks: List[Dict[str, float]], skill_name: str,
+                       skill_level: str = "beginner", dominant_hand: str = "right") -> Dict[str, Any]:
         feedback = []
         technique_score = 100.0
 
@@ -19,41 +21,37 @@ class CombatAnalyzer(BaseAnalyzer):
         right_hip = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_HIP"])
 
         # Guard check
-        avg_shoulder_y = (left_shoulder["y"] + right_shoulder["y"]) / 2
-        if left_wrist["y"] < avg_shoulder_y and right_wrist["y"] < avg_shoulder_y:
-            feedback.append("✅ Good guard - hands up.")
-        else:
-            feedback.append("❌ Guard low - keep hands protecting the face.")
-            technique_score -= 15.0
+        if PoseUtils.is_confident(left_shoulder) and PoseUtils.is_confident(right_shoulder) \
+                and PoseUtils.is_confident(left_wrist) and PoseUtils.is_confident(right_wrist):
+            avg_shoulder_y = (left_shoulder["y"] + right_shoulder["y"]) / 2
+            if left_wrist["y"] < avg_shoulder_y and right_wrist["y"] < avg_shoulder_y:
+                feedback.append("✅ Good guard - hands up.")
+            else:
+                feedback.append("❌ Guard low - keep hands protecting the face.")
+                technique_score -= scale_penalty(15.0, skill_level)
 
         # Hip rotation hint
-        hip_rotation = abs(left_hip["x"] - right_hip["x"])
-        if hip_rotation > 0.08:
-            feedback.append("✅ Adequate hip rotation for power.")
-        else:
-            feedback.append("⚠️ Increase hip rotation when striking.")
-            technique_score -= 8.0
+        if PoseUtils.is_confident(left_hip) and PoseUtils.is_confident(right_hip):
+            hip_rotation = abs(left_hip["x"] - right_hip["x"])
+            delta, msg = self.check_min(
+                hip_rotation, 0.08, skill_level, penalty=8,
+                pass_msg="✅ Adequate hip rotation for power.",
+                fail_msg="⚠️ Increase hip rotation when striking.",
+            )
+            technique_score += delta
+            feedback.append(msg)
 
         balance_score, balance_feedback = PoseUtils.analyze_balance(landmarks)
         feedback.append(balance_feedback)
 
-        overall_score = max(0.0, technique_score * 0.65 + balance_score * 0.35)
+        technique_score = max(0.0, technique_score)
+        overall_score = self.blend_scores(technique_score, balance_score, 0.65)
 
         return {
             "score": overall_score,
-            "technique_accuracy": max(0.0, technique_score),
+            "technique_accuracy": technique_score,
             "balance_score": balance_score,
             "feedback": feedback,
-        }
-
-    def analyze_session(self, pose_sequence: List[List[Dict[str, float]]], skill_name: str) -> Dict[str, Any]:
-        frame_results = [self.analyze_frame(frame, skill_name) for frame in pose_sequence]
-        avg_score = sum(r["score"] for r in frame_results) / len(frame_results) if frame_results else 0.0
-        return {
-            "overall_score": round(avg_score, 2),
-            "technique_accuracy": round(sum(r["technique_accuracy"] for r in frame_results) / len(frame_results), 2) if frame_results else 0.0,
-            "balance_score": round(sum(r["balance_score"] for r in frame_results) / len(frame_results), 2) if frame_results else 0.0,
-            "frame_count": len(frame_results),
         }
 
     def get_supported_skills(self) -> List[str]:

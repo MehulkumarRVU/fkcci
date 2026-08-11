@@ -12,6 +12,14 @@ if str(BACKEND_ROOT) not in sys.path:
 os.environ.setdefault("ENV", "test")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-pocketcoach")
 os.environ.setdefault("REDIS_URL", "")
+# The main app's RateLimitMiddleware instance (and its in-memory bucket) is
+# created once and shared across the whole pytest session since conftest
+# imports `backend.main.app` a single time - cumulative requests from the
+# growing test suite were tripping the default 60-req/60s limit well before
+# any individual test misbehaved. test_rate_limit.py/test_rate_limit_redis.py
+# build their own isolated app + middleware instance with explicit limits,
+# so raising this ambient default doesn't weaken what they test.
+os.environ.setdefault("RATE_LIMIT_REQUESTS", "5000")
 
 import tempfile
 

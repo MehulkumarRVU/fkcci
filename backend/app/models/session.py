@@ -28,7 +28,21 @@ class Session(Base):
     
     # Detailed Data
     session_data = Column(JSON, nullable=True)  # Stores detailed analysis data
-    
+
+    # Which pose-scoring engine generation produced this session's scores.
+    # 'v1' = pre-refactor (flat-average, no skill-level sensitivity, no
+    # real reaction_score). 'v2' = shared-threshold engine with skill-level
+    # tolerance, temporal smoothing, and a real fault-recovery reaction_score.
+    # Lets historical scores stay distinguishable across the accuracy overhaul
+    # instead of silently mixing two incomparable scoring generations.
+    scoring_version = Column(String, default="v2")
+
+    # Which skill was practiced (only sport_type was tracked before) and a
+    # structured per-joint summary from the session's pose sequence - the
+    # data a persistent athlete "digital twin" profile aggregates over time.
+    skill_name = Column(String, nullable=True)
+    joint_summary = Column(JSON, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

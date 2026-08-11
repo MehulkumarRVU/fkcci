@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Detail - PocketCoach AI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="navbar-brand">🎯 PocketCoach AI</a>
+            <ul class="navbar-nav">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li id="adminLink" style="display: none;"><a href="admin.html">Coach Analytics</a></li>
+                <li><a href="session.html">Start Session</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-danger">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="padding: 2rem; max-width: 900px;">
+        <a href="dashboard.html" style="color: var(--text-secondary); text-decoration: none;">&larr; Back to Dashboard</a>
+
+        <div id="loadingState" class="card mt-3">
+            <div class="spinner"></div>
+        </div>
+
+        <div id="notFoundState" class="card mt-3 hidden">
+            <p>Session not found, or you don't have access to it.</p>
+        </div>
+
+        <div id="sessionContent" class="hidden">
+            <!-- Header -->
+            <div class="card mt-3">
+                <div class="flex justify-between align-center">
+                    <div>
+                        <h2 id="sessionTitle" style="margin: 0;">Session</h2>
+                        <p style="color: var(--text-secondary); margin: 0.25rem 0 0 0;" id="sessionMeta">-</p>
+                    </div>
+                    <button id="downloadSessionPdfBtn" class="btn btn-outline btn-small">📄 Download PDF</button>
+                </div>
+            </div>
+
+            <!-- Scores -->
+            <div class="stats-grid">
+                <div class="stat-card stat-card-primary">
+                    <span class="stat-value" id="scorePerformance">0</span>
+                    <span class="stat-label">Performance</span>
+                </div>
+                <div class="stat-card stat-card-warning">
+                    <span class="stat-value" id="scoreTechnique">0</span>
+                    <span class="stat-label">Technique</span>
+                </div>
+                <div class="stat-card stat-card-secondary">
+                    <span class="stat-value" id="scoreReaction">0</span>
+                    <span class="stat-label">Reaction</span>
+                </div>
+                <div class="stat-card stat-card-accent">
+                    <span class="stat-value" id="scoreBalance">0</span>
+                    <span class="stat-label">Balance</span>
+                </div>
+            </div>
+
+            <!-- Joint deviation breakdown -->
+            <div class="card mt-3" id="jointBreakdownCard">
+                <h3 class="card-header">🦴 Joint Deviation Breakdown</h3>
+                <div id="jointBreakdownContent">
+                    <p style="color: var(--text-secondary);">No per-joint data available for this session.</p>
+                </div>
+            </div>
+
+            <!-- Analysis details -->
+            <div class="card mt-3" id="analysisDetailsCard">
+                <h3 class="card-header">🔍 Analysis Details</h3>
+                <div id="analysisDetailsContent"></div>
+            </div>
+
+            <!-- Notes scoped to this session -->
+            <div class="card mt-3" id="sessionNotesCard">
+                <h3 class="card-header">📝 Notes</h3>
+                <div id="sessionNotesThread" class="notes-thread">
+                    <p style="color: var(--text-secondary);">Loading notes...</p>
+                </div>
+                <div class="notes-composer">
+                    <textarea id="sessionNoteInput" class="form-textarea" placeholder="Add a note about this session..."></textarea>
+                    <button id="sessionNoteSendBtn" class="btn btn-primary">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/auth-utils.js"></script>
+    <script src="../js/session-detail.js"></script>
+</body>
+</html>

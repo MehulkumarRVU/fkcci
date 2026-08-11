@@ -151,6 +151,7 @@ async function loadProfile() {
 
         // Load statistics
         loadStatistics();
+        loadDigitalTwin();
 
     } catch (error) {
         console.error('Error loading profile:', error);
@@ -287,6 +288,110 @@ document.getElementById('updatePreferencesForm').addEventListener('submit', asyn
         showAlert('Failed to update preferences', 'error');
     }
 });
+
+const downloadProgressPdfBtn = document.getElementById('downloadProgressPdfBtn');
+if (downloadProgressPdfBtn) {
+    downloadProgressPdfBtn.addEventListener('click', async () => {
+        downloadProgressPdfBtn.disabled = true;
+        const originalText = downloadProgressPdfBtn.textContent;
+        downloadProgressPdfBtn.textContent = 'Generating...';
+        try {
+            await downloadFile(`${API_URL}/api/reports/progress/pdf`, 'progress_report.pdf');
+        } catch (error) {
+            console.error('Error downloading progress report:', error);
+            showAlert('Failed to download progress report', 'error');
+        } finally {
+            downloadProgressPdfBtn.disabled = false;
+            downloadProgressPdfBtn.textContent = originalText;
+        }
+    });
+}
+
+// Digital Twin: score-over-time trend + recurring joint-deviation tendencies,
+// aggregated server-side from real session history (backend
+// app/services/profile_twin_service.py) - not recomputed here.
+async function loadDigitalTwin() {
+    try {
+        const response = await fetchWithAuth(`${API_URL}/api/analytics/me/profile-twin`);
+        if (!response.ok) return;
+
+        const twin = await response.json();
+        const emptyState = document.getElementById('twinEmptyState');
+        const content = document.getElementById('twinContent');
+
+        if (!twin.total_sessions || twin.score_trend.length === 0) {
+            emptyState.classList.remove('hidden');
+            content.classList.add('hidden');
+            return;
+        }
+
+        emptyState.classList.add('hidden');
+        content.classList.remove('hidden');
+
+        const trendLabels = {
+            improving: '📈 Improving',
+            declining: '📉 Declining',
+            stable: '➖ Stable',
+            insufficient_data: 'Not enough data yet'
+        };
+        document.getElementById('twinTrendDirection').textContent = trendLabels[twin.trend_direction] || twin.trend_direction;
+
+        drawTrendSparkline(document.getElementById('twinTrendCanvas'), twin.score_trend.map(p => p.score));
+
+        const perSportEl = document.getElementById('twinPerSport');
+        const sports = Object.entries(twin.per_sport || {});
+        perSportEl.innerHTML = sports.length
+            ? sports.map(([sport, stats]) => `
+                <div class="flex justify-between" style="padding: 0.25rem 0; border-bottom: 1px solid var(--border-color);">
+                    <span>${sport.replace(/_/g, ' ')}</span>
+                    <span>${stats.avg_score.toFixed(1)} avg (${stats.session_count} sessions, ${stats.trend_direction})</span>
+                </div>
+            `).join('')
+            : '<p style="color: var(--text-secondary);">No per-sport data yet.</p>';
+
+        const tendenciesEl = document.getElementById('twinTendencies');
+        const tendencies = twin.recurring_tendencies || [];
+        tendenciesEl.innerHTML = tendencies.length
+            ? tendencies.map(t => `<li>${t.joint}: ${t.high_count} high-deviation, ${t.medium_count} medium-deviation frames</li>`).join('')
+            : '<li style="color: var(--text-secondary); list-style: none;">No recurring form issues detected yet - keep training to build this out.</li>';
+
+    } catch (error) {
+        console.error('Error loading digital twin:', error);
+    }
+}
+
+function drawTrendSparkline(canvas, scores) {
+    if (!canvas || scores.length === 0) return;
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+
+    const padding = 10;
+    const min = Math.min(...scores, 0);
+    const max = Math.max(...scores, 100);
+    const range = Math.max(max - min, 1);
+
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    scores.forEach((score, i) => {
+        const x = padding + (i / Math.max(scores.length - 1, 1)) * (width - padding * 2);
+        const y = height - padding - ((score - min) / range) * (height - padding * 2);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    ctx.fillStyle = '#2563eb';
+    scores.forEach((score, i) => {
+        const x = padding + (i / Math.max(scores.length - 1, 1)) * (width - padding * 2);
+        const y = height - padding - ((score - min) / range) * (height - padding * 2);
+        ctx.beginPath();
+        ctx.arc(x, y, 2.5, 0, 2 * Math.PI);
+        ctx.fill();
+    });
+}
 
 // Helper functions
 function showAlert(message, type = 'info') {

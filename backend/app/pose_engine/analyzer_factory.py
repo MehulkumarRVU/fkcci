@@ -1,5 +1,5 @@
-
 from typing import Dict
+
 from .sports.table_tennis_analyzer import TableTennisAnalyzer
 from .sports.boxing_analyzer import BoxingAnalyzer
 from .sports.badminton_analyzer import BadmintonAnalyzer
@@ -12,6 +12,27 @@ from .sports.fitness_analyzer import FitnessAnalyzer
 from .sports.fencing_analyzer import FencingAnalyzer
 from .sports.basketball_analyzer import BasketballAnalyzer
 from .sports.ai_gym_coach_analyzer import AIGymCoachAnalyzer
+from .sports.generic_fallback_analyzer import GenericFallbackAnalyzer
+
+
+class UnregisteredSportError(ValueError):
+    """A sport exists in sports_registry but has no analyzer mapped here at
+    all (not even the fallback) - a safety net for a sport added to the
+    registry without a corresponding factory entry."""
+
+
+# Sports with a valid sports_registry entry but no tuned pose analyzer.
+# Fabricating a score by borrowing an unrelated analyzer's checks (e.g.
+# scoring kabaddi with boxing's guard-position logic) would look plausible
+# but be meaningless, so these get the honest GenericFallbackAnalyzer
+# instead. motogp/formula1 get a distinct reason since they're not
+# pose-coachable in principle (seated/helmeted/vehicle-occluded), not just
+# "not built yet".
+NOT_YET_IMPLEMENTED = {
+    "football", "baseball", "cricket", "gymnastics", "hockey", "ice_hockey",
+    "kabaddi", "shooting", "swimming", "weight_lifting", "wwe",
+}
+NOT_POSE_COACHABLE = {"motogp", "formula1"}
 
 
 class AnalyzerFactory:
@@ -48,14 +69,20 @@ class AnalyzerFactory:
     }
 
     @classmethod
+    def _fallback(cls, sport_type: str):
+        reason = "not_pose_coachable" if sport_type in NOT_POSE_COACHABLE else "not_yet_implemented"
+        return GenericFallbackAnalyzer(sport_type=sport_type, reason=reason)
+
+    @classmethod
     def get_analyzer(cls, sport_type: str):
+        if sport_type in NOT_YET_IMPLEMENTED or sport_type in NOT_POSE_COACHABLE:
+            return cls._fallback(sport_type)
         analyzer_factory = cls._registry.get(sport_type)
         if not analyzer_factory:
-            raise ValueError(f"No analyzer registered for sport type: {sport_type}")
-        # registry entries can be classes or callables returning instances
-        if callable(analyzer_factory):
-            return analyzer_factory() if not isinstance(analyzer_factory, type) else analyzer_factory()
-        return analyzer_factory
+            raise UnregisteredSportError(f"No analyzer registered for sport type: {sport_type}")
+        # registry entries are either analyzer classes or zero-arg lambdas -
+        # both are directly callable to produce an instance.
+        return analyzer_factory()
 
     @classmethod
     def register_analyzer(cls, sport_type: str, analyzer_cls):
