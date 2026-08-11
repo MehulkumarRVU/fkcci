@@ -74,6 +74,39 @@
             </div>
         </div>
 
+        <!-- Coach Connection (athletes only) -->
+        <div class="card mt-4 hidden" id="coachConnectionCard">
+            <h3 class="card-header">🧑‍🏫 Coach Connection</h3>
+            <div class="card-body">
+                <div id="coachConnUnconnected">
+                    <p style="color: var(--text-secondary);">You don't have a coach yet. Search for one or join with an invite code.</p>
+                    <div class="form-group">
+                        <label class="form-label" for="coachSearchInput">Search coaches by username</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="coachSearchInput" class="form-input" placeholder="e.g. coach_jane">
+                            <button id="coachSearchBtn" class="btn btn-outline" type="button">Search</button>
+                        </div>
+                        <div id="coachSearchResults" class="mt-2"></div>
+                    </div>
+                    <div class="form-group mt-3">
+                        <label class="form-label" for="inviteCodeInput">Have an invite code?</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="inviteCodeInput" class="form-input" placeholder="Enter code">
+                            <button id="joinInviteBtn" class="btn btn-primary" type="button">Join</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="coachConnPending" class="hidden">
+                    <p>Your request to <strong id="pendingCoachName">-</strong> is pending approval.</p>
+                    <button id="cancelRequestBtn" class="btn btn-outline btn-small" type="button">Cancel Request</button>
+                </div>
+                <div id="coachConnConnected" class="hidden">
+                    <p>You're connected with coach <strong id="connectedCoachName">-</strong>.</p>
+                    <button id="leaveCoachBtn" class="btn btn-danger btn-small" type="button">Disconnect</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Physical Stats -->
         <div class="card mt-4">
             <h3 class="card-header">Physical Stats</h3>

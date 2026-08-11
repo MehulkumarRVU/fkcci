@@ -153,10 +153,158 @@ async function loadProfile() {
         loadStatistics();
         loadDigitalTwin();
 
+        // Coach connection is an athlete-side concept (coaches manage
+        // requests/invite codes from admin.html instead).
+        if (athlete.role === 'athlete') {
+            document.getElementById('coachConnectionCard').classList.remove('hidden');
+            loadCoachConnection();
+        }
+
     } catch (error) {
         console.error('Error loading profile:', error);
         showAlert('Failed to load profile data', 'error');
     }
+}
+
+// Coach connection: search+request or invite-code join, plus pending/connected state.
+async function loadCoachConnection() {
+    try {
+        const response = await fetchWithAuth(`${API_URL}/api/coaches/me/connection-status`);
+        if (!response.ok) return;
+        const status = await response.json();
+
+        const unconnectedEl = document.getElementById('coachConnUnconnected');
+        const pendingEl = document.getElementById('coachConnPending');
+        const connectedEl = document.getElementById('coachConnConnected');
+
+        unconnectedEl.classList.add('hidden');
+        pendingEl.classList.add('hidden');
+        connectedEl.classList.add('hidden');
+
+        if (status.connected_coach) {
+            connectedEl.classList.remove('hidden');
+            document.getElementById('connectedCoachName').textContent = status.connected_coach.username;
+        } else if (status.pending_request) {
+            pendingEl.classList.remove('hidden');
+            document.getElementById('pendingCoachName').textContent =
+                status.pending_request.coach ? status.pending_request.coach.username : `Coach #${status.pending_request.coach_id}`;
+            pendingEl.dataset.requestId = status.pending_request.id;
+        } else {
+            unconnectedEl.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Error loading coach connection status:', error);
+    }
+}
+
+const coachSearchBtn = document.getElementById('coachSearchBtn');
+if (coachSearchBtn) {
+    coachSearchBtn.addEventListener('click', async () => {
+        const q = document.getElementById('coachSearchInput').value.trim();
+        const resultsEl = document.getElementById('coachSearchResults');
+        try {
+            const response = await fetchWithAuth(`${API_URL}/api/coaches/search?q=${encodeURIComponent(q)}`);
+            if (!response.ok) throw new Error('Search failed');
+            const coaches = await response.json();
+
+            resultsEl.innerHTML = coaches.length === 0
+                ? '<p style="color: var(--text-secondary);">No coaches found.</p>'
+                : coaches.map(c => `
+                    <div class="flex justify-between align-center" style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+                        <span>${c.username}</span>
+                        <button class="btn btn-primary btn-small" data-coach-id="${c.id}">Request</button>
+                    </div>
+                `).join('');
+
+            resultsEl.querySelectorAll('button[data-coach-id]').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    btn.disabled = true;
+                    try {
+                        const reqResp = await fetchWithAuth(`${API_URL}/api/coaches/${btn.dataset.coachId}/request`, {
+                            method: 'POST',
+                        });
+                        if (!reqResp.ok) {
+                            const err = await reqResp.json();
+                            throw new Error(err.detail || 'Failed to send request');
+                        }
+                        showAlert('Connection request sent!', 'success');
+                        await loadCoachConnection();
+                    } catch (error) {
+                        showAlert(error.message, 'error');
+                        btn.disabled = false;
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Error searching coaches:', error);
+            resultsEl.innerHTML = '<p style="color: var(--danger-color);">Search failed.</p>';
+        }
+    });
+}
+
+const joinInviteBtn = document.getElementById('joinInviteBtn');
+if (joinInviteBtn) {
+    joinInviteBtn.addEventListener('click', async () => {
+        const code = document.getElementById('inviteCodeInput').value.trim();
+        if (!code) return;
+        joinInviteBtn.disabled = true;
+        try {
+            const response = await fetchWithAuth(`${API_URL}/api/coaches/join/${encodeURIComponent(code)}`, {
+                method: 'POST',
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Failed to join with that code');
+            }
+            showAlert('Connected with your coach!', 'success');
+            await loadCoachConnection();
+        } catch (error) {
+            showAlert(error.message, 'error');
+        } finally {
+            joinInviteBtn.disabled = false;
+        }
+    });
+}
+
+const cancelRequestBtn = document.getElementById('cancelRequestBtn');
+if (cancelRequestBtn) {
+    cancelRequestBtn.addEventListener('click', async () => {
+        const requestId = document.getElementById('coachConnPending').dataset.requestId;
+        if (!requestId) return;
+        cancelRequestBtn.disabled = true;
+        try {
+            const response = await fetchWithAuth(`${API_URL}/api/coaches/requests/${requestId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok && response.status !== 204) throw new Error('Failed to cancel request');
+            showAlert('Request cancelled.', 'success');
+            await loadCoachConnection();
+        } catch (error) {
+            showAlert(error.message, 'error');
+        } finally {
+            cancelRequestBtn.disabled = false;
+        }
+    });
+}
+
+const leaveCoachBtn = document.getElementById('leaveCoachBtn');
+if (leaveCoachBtn) {
+    leaveCoachBtn.addEventListener('click', async () => {
+        if (!confirm('Disconnect from your coach?')) return;
+        leaveCoachBtn.disabled = true;
+        try {
+            const response = await fetchWithAuth(`${API_URL}/api/coaches/me/leave`, {
+                method: 'POST',
+            });
+            if (!response.ok && response.status !== 204) throw new Error('Failed to disconnect');
+            showAlert('Disconnected from coach.', 'success');
+            await loadCoachConnection();
+        } catch (error) {
+            showAlert(error.message, 'error');
+        } finally {
+            leaveCoachBtn.disabled = false;
+        }
+    });
 }
 
 // Load statistics

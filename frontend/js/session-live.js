@@ -14,6 +14,20 @@ let athlete = null;
 let sessionType = null;
 let analysisFrameCount = 0;
 let skeleton3D = null;
+let isPaused = false;
+let pausedAccumulatedMs = 0;
+let pauseStartedAt = null;
+let repCounter = null;
+
+// Warn before an accidental tab close/refresh loses an in-progress
+// session - no per-frame data is persisted to the backend mid-session, so
+// a hard refresh would lose the in-memory score/pose buffers.
+window.addEventListener('beforeunload', (e) => {
+    if (sessionStorage.getItem('activeSession')) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
 
 function setCameraStatus(message, isError = false) {
     const statusEl = document.getElementById('cameraStatus');
@@ -46,6 +60,7 @@ async function initLiveSession() {
     });
 
     document.getElementById('endSessionBtn').addEventListener('click', endSession);
+    document.getElementById('pauseBtn').addEventListener('click', togglePause);
     const endSessionBtnSecondary = document.getElementById('endSessionBtnSecondary');
     if (endSessionBtnSecondary) {
         endSessionBtnSecondary.addEventListener('click', endSession);
@@ -71,6 +86,13 @@ async function initLiveSession() {
     poseDetector = new PoseDetector();
     sportsAnalyzer = new SportsAnalyzer(athlete.sport_type, sessionType, athlete.dominant_hand, athlete.skill_level);
     skeleton3D = new Skeleton3D(document.getElementById('skeleton3dContainer'));
+
+    repCounter = new RepCounter(athlete.sport_type, currentSkill.name, athlete.dominant_hand);
+    if (repCounter.hasCounter()) {
+        document.getElementById('liveCountCard').classList.remove('hidden');
+        document.getElementById('liveCountLabel').textContent = repCounter.getLabel();
+        document.getElementById('liveCountValue').textContent = '0';
+    }
 
     const toggle3dBtn = document.getElementById('toggle3dBtn');
     if (toggle3dBtn) {
@@ -157,7 +179,49 @@ function stopCamera() {
     setCameraStatus('Camera stopped. Click Start Camera to resume.');
 }
 
+function togglePause() {
+    if (isPaused) {
+        resumeSession();
+    } else {
+        pauseSession();
+    }
+}
+
+function pauseSession() {
+    isPaused = true;
+    pauseStartedAt = Date.now();
+
+    if (sessionTimer) {
+        clearInterval(sessionTimer);
+        sessionTimer = null;
+    }
+
+    document.getElementById('pauseBtn').textContent = '▶️ Resume';
+    const badge = document.getElementById('pausedBadge');
+    badge.classList.remove('hidden');
+    badge.style.display = 'flex';
+    setCameraStatus('Session paused. Analysis and scoring are on hold.');
+}
+
+function resumeSession() {
+    isPaused = false;
+    if (pauseStartedAt) {
+        pausedAccumulatedMs += Date.now() - pauseStartedAt;
+        pauseStartedAt = null;
+    }
+
+    startSessionTimer();
+
+    document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+    const badge = document.getElementById('pausedBadge');
+    badge.classList.add('hidden');
+    badge.style.display = 'none';
+    setCameraStatus('Camera active. Pose detection is running.');
+}
+
 function onPoseResults(landmarks) {
+    if (isPaused) return;
+
     const localAnalysis = sportsAnalyzer.analyzeLocally(landmarks, currentSkill.name);
 
     updateLiveScore(localAnalysis.score, localAnalysis.score, 0, localAnalysis.score);
@@ -171,6 +235,11 @@ function onPoseResults(landmarks) {
     // path above, and no-ops until the user toggles the 3D view on.
     if (skeleton3D && skeleton3D.isActive()) {
         skeleton3D.updateFromLandmarks(landmarks);
+    }
+
+    if (repCounter && repCounter.hasCounter()) {
+        repCounter.update(landmarks);
+        document.getElementById('liveCountValue').textContent = repCounter.getCount();
     }
 
     // Downsampled buffer used at session end for a real, backend-computed
@@ -249,7 +318,7 @@ function updateLiveScore(overall, technique, reaction, balance) {
 
 function startSessionTimer() {
     sessionTimer = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+        const elapsed = Math.floor((Date.now() - sessionStartTime - pausedAccumulatedMs) / 1000);
         const minutes = Math.floor(elapsed / 60);
         const seconds = elapsed % 60;
         document.getElementById('sessionDuration').textContent =
@@ -266,7 +335,14 @@ async function endSession() {
         clearInterval(sessionTimer);
     }
 
-    const durationMinutes = Math.floor((Date.now() - sessionStartTime) / 60000);
+    // Fold in any pause still in progress so it isn't dropped from the
+    // excluded-time total when ending while paused.
+    if (isPaused && pauseStartedAt) {
+        pausedAccumulatedMs += Date.now() - pauseStartedAt;
+        pauseStartedAt = null;
+    }
+
+    const durationMinutes = Math.floor((Date.now() - sessionStartTime - pausedAccumulatedMs) / 60000);
     const avgScore = sportsAnalyzer.getAverageScore();
 
     // Fallback values from real per-response server measurements tracked
@@ -288,6 +364,7 @@ async function endSession() {
     // Full-session analysis: temporal smoothing, low-confidence frame
     // rejection, and a real event-based reaction_score (or an honest
     // "not_measured"/"insufficient_data" status instead of a guess).
+    let serverDetailedCounts = null;
     const poseBuffer = sportsAnalyzer.getPoseBuffer();
     if (poseBuffer.length > 0) {
         try {
@@ -318,6 +395,7 @@ async function endSession() {
                         },
                         joint_summary: (analysis.detailed_analysis && analysis.detailed_analysis.joint_deviation_summary) || null
                     };
+                    serverDetailedCounts = (analysis.detailed_analysis && analysis.detailed_analysis.detailed) || null;
                 } else if (analysis.supported === false) {
                     console.warn('Session analysis not supported for this sport:', analysis.reason);
                 }
@@ -335,9 +413,9 @@ async function endSession() {
 
         if (!response.ok) throw new Error('Failed to update session');
 
-        await response.json();
+        const savedSession = await response.json();
         sessionStorage.removeItem('activeSession');
-        window.location.href = 'dashboard.html';
+        showSessionSummary(savedSession, serverDetailedCounts);
     } catch (error) {
         console.error('Error ending session:', error);
         alert('Failed to save session data');
@@ -354,10 +432,11 @@ function getSessionTypeHint(sessionType) {
     return hints[sessionType] || 'Perform this session with the correct focus for your chosen mode.';
 }
 
-function showSessionSummary(session) {
+function showSessionSummary(session, serverDetailedCounts) {
     document.getElementById('summaryScore').textContent = Math.round(session.performance_score);
     document.getElementById('summaryTechnique').textContent = Math.round(session.technique_accuracy);
-    document.getElementById('summaryReaction').textContent = Math.round(session.reaction_score);
+    document.getElementById('summaryReaction').textContent =
+        session.reaction_score === null || session.reaction_score === undefined ? 'N/A' : Math.round(session.reaction_score);
     document.getElementById('summaryBalance').textContent = Math.round(session.balance_score);
     document.getElementById('summaryDuration').textContent = session.duration_minutes;
 
@@ -367,6 +446,26 @@ function showSessionSummary(session) {
     else if (session.performance_score >= 75) scoreDisplay.classList.add('good');
     else if (session.performance_score >= 60) scoreDisplay.classList.add('average');
     else scoreDisplay.classList.add('poor');
+
+    // Server-authoritative rep/combo/jump count, computed from the exact
+    // same session pose buffer as the live client-side count - shown as
+    // the "official" number, with the live count alongside it for
+    // transparency about how closely the two matched during the session.
+    if (repCounter && repCounter.hasCounter() && serverDetailedCounts) {
+        const countKeyByMode = {
+            squat: 'estimated_reps',
+            pushup: 'estimated_reps',
+            combo: 'combination_count',
+            jump: 'estimated_jumps'
+        };
+        const serverCount = serverDetailedCounts[countKeyByMode[repCounter.mode]];
+        if (serverCount !== undefined) {
+            document.getElementById('summaryCountLabel').textContent = repCounter.getLabel().replace(/^\S+\s/, '');
+            document.getElementById('summaryFinalCount').textContent = serverCount;
+            document.getElementById('summaryLiveCount').textContent = repCounter.getCount();
+            document.getElementById('summaryCountRow').classList.remove('hidden');
+        }
+    }
 
     document.getElementById('sessionSummary').classList.remove('hidden');
 }

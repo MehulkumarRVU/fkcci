@@ -14,6 +14,7 @@ from app.routes import (
     gamification_router,
     reports_router,
     notes_router,
+    coaches_router,
 )
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.config import settings
@@ -67,6 +68,7 @@ app.include_router(analytics_router)
 app.include_router(gamification_router)
 app.include_router(reports_router)
 app.include_router(notes_router)
+app.include_router(coaches_router)
 
 # Root endpoint
 @app.get("/")

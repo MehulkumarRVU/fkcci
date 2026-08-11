@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..models.athlete import Athlete
 from ..models.refresh_token import RefreshToken
+from ..models.password_reset_token import PasswordResetToken
 from ..repositories.athlete_repository import AthleteRepository
 
 ALGORITHM = settings.ALGORITHM
@@ -103,5 +104,40 @@ class AuthService:
         if not rt:
             return False
         rt.revoked = True
+        self.db.commit()
+        return True
+
+    def create_password_reset_token(self, athlete: Athlete, expires_minutes: int = 60) -> str:
+        token = secrets.token_urlsafe(32)
+        token_hash = hmac.new(settings.SECRET_KEY.encode(), token.encode(), hashlib.sha256).hexdigest()
+        expires_at = datetime.utcnow() + timedelta(minutes=expires_minutes)
+        prt = PasswordResetToken(
+            athlete_id=athlete.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            used=False,
+        )
+        self.db.add(prt)
+        self.db.commit()
+        self.db.refresh(prt)
+        return token
+
+    def verify_password_reset_token(self, token: str) -> Optional[PasswordResetToken]:
+        token_hash = hmac.new(settings.SECRET_KEY.encode(), token.encode(), hashlib.sha256).hexdigest()
+        prt = (
+            self.db.query(PasswordResetToken)
+            .filter(PasswordResetToken.token_hash == token_hash, PasswordResetToken.used == False)
+            .first()
+        )
+        if not prt or prt.expires_at < datetime.utcnow():
+            return None
+        return prt
+
+    def consume_password_reset_token(self, token: str) -> bool:
+        token_hash = hmac.new(settings.SECRET_KEY.encode(), token.encode(), hashlib.sha256).hexdigest()
+        prt = self.db.query(PasswordResetToken).filter(PasswordResetToken.token_hash == token_hash).first()
+        if not prt:
+            return False
+        prt.used = True
         self.db.commit()
         return True

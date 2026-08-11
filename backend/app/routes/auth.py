@@ -15,6 +15,7 @@ from ..models.athlete import Athlete
 from ..config import settings
 from ..sports_registry import is_valid_sport, VALID_SPORTS
 from ..services.auth_service import AuthService
+from ..services.email_service import send_password_reset_email
 
 try:
     import bcrypt
@@ -425,5 +426,58 @@ async def refresh_token(current_athlete: Athlete = Depends(get_current_athlete))
     access_token = create_access_token(
         data={"sub": current_athlete.username}, expires_delta=access_token_expires
     )
-    
+
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+
+_GENERIC_RESET_RESPONSE = {"message": "If that email is registered, password reset instructions have been sent."}
+
+
+@router.post("/password-reset/request")
+async def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(get_db)):
+    """Always returns the same generic response regardless of whether the
+    email is registered, to prevent account enumeration. Covered by the
+    global IP-based RateLimitMiddleware already applied to every route."""
+    athlete = db.query(Athlete).filter(Athlete.email == payload.email).first()
+    if athlete:
+        auth_service = AuthService(db)
+        token = auth_service.create_password_reset_token(athlete)
+        reset_link = f"{settings.FRONTEND_BASE_URL}/pages/reset-password.html?token={token}"
+        send_password_reset_email(athlete.email, reset_link)
+
+    return _GENERIC_RESET_RESPONSE
+
+
+@router.post("/password-reset/confirm")
+async def confirm_password_reset(payload: PasswordResetConfirm, db: Session = Depends(get_db)):
+    auth_service = AuthService(db)
+    prt = auth_service.verify_password_reset_token(payload.token)
+    if not prt:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
+
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password must be at least 6 characters")
+
+    athlete = db.query(Athlete).filter(Athlete.id == prt.athlete_id).first()
+    if not athlete:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
+
+    athlete.hashed_password = get_password_hash(payload.new_password)
+    auth_service.consume_password_reset_token(payload.token)
+
+    # Force re-login everywhere - standard practice after a password change.
+    db.query(RefreshToken).filter(RefreshToken.athlete_id == athlete.id, RefreshToken.revoked == False).update(
+        {"revoked": True}
+    )
+    db.commit()
+
+    return {"message": "Password has been reset. Please log in with your new password."}

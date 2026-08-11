@@ -46,6 +46,25 @@
             </div>
         </div>
 
+        <!-- Invite Code Section -->
+        <div class="section-title">Invite Code</div>
+        <div class="card">
+            <p style="color: var(--text-secondary);">Share this code with an athlete so they can connect with you instantly.</p>
+            <div class="flex gap-2 align-center mt-2">
+                <code id="inviteCodeValue" style="font-size: 1.1rem; padding: 0.4rem 0.75rem; background: var(--light-bg); border-radius: 0.375rem;">-</code>
+                <button id="copyInviteCodeBtn" class="btn btn-outline btn-small" type="button">Copy</button>
+                <button id="regenerateInviteCodeBtn" class="btn btn-outline btn-small" type="button">Generate New Code</button>
+            </div>
+        </div>
+
+        <!-- Pending Connection Requests Section -->
+        <div class="section-title">Pending Connection Requests</div>
+        <div id="pendingRequestsContainer">
+            <div class="card">
+                <p style="color: var(--text-secondary);">No pending requests.</p>
+            </div>
+        </div>
+
         <!-- Athletes Section -->
         <div class="section-title">Your Athletes</div>
         <div id="athletesContainer" class="athletes-grid">

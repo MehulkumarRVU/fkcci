@@ -268,7 +268,7 @@ async function startSession(e) {
             startedAt: Date.now()
         }));
 
-        window.location.href = 'session-live.html';
+        window.location.href = 'session-precheck.html';
 
     } catch (error) {
         console.error('Error starting session:', error);

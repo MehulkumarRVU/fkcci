@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Check - PocketCoach AI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="navbar-brand">🎯 PocketCoach AI</a>
+            <ul class="navbar-nav">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="session.html">Start Session</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-danger">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="padding: 2rem; max-width: 900px;">
+        <div class="card">
+            <h2 class="card-header">Camera &amp; Equipment Check</h2>
+            <p style="color: var(--text-secondary);">
+                Before your session starts, let's make sure your camera can see your full body clearly.
+            </p>
+
+            <div class="grid grid-2 gap-3 mt-3">
+                <div>
+                    <div class="video-container">
+                        <video id="webcam" autoplay playsinline muted></video>
+                        <canvas id="poseCanvas" class="video-canvas"></canvas>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="flex justify-between align-center">
+                            <button id="startCameraBtn" class="btn btn-primary">Start Camera</button>
+                            <div>
+                                <span style="font-weight: 500;">FPS: </span>
+                                <span id="fpsDisplay">0</span>
+                                &nbsp;|&nbsp;
+                                <span style="font-weight: 500;">Resolution: </span>
+                                <span id="resolutionDisplay">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="card">
+                        <h4>Body Visibility</h4>
+                        <div class="progress-bar mt-2">
+                            <div class="progress-fill" id="visibilityProgress" style="width: 0%">0%</div>
+                        </div>
+                        <p id="visibilityStatus" style="color: var(--text-secondary); margin-top: 0.75rem;">
+                            Start your camera to begin the check.
+                        </p>
+                    </div>
+
+                    <div class="card mt-3">
+                        <h4>Positioning Tips</h4>
+                        <ul style="color: var(--text-secondary); padding-left: 1.25rem; margin: 0;">
+                            <li>Stand 6-8 feet (2-2.5m) back from the camera</li>
+                            <li>Make sure your shoulders, hips, and knees are all in frame</li>
+                            <li>Use a well-lit room, avoid strong backlight</li>
+                            <li>Wear clothing that contrasts with the background</li>
+                        </ul>
+                    </div>
+
+                    <div class="card mt-3 hidden" id="troubleshootingCard">
+                        <p id="troubleshootingMessage" style="color: var(--danger-color); margin: 0;"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <button id="readyBtn" class="btn btn-primary btn-large" style="width: 100%;" disabled>
+                    Checking camera...
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/auth-utils.js"></script>
+    <script src="../js/pose-detection.js"></script>
+    <script src="../js/session-precheck.js"></script>
+</body>
+</html>

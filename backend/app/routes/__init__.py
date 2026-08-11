@@ -6,6 +6,7 @@ from .analytics import router as analytics_router
 from .gamification import router as gamification_router
 from .reports import router as reports_router
 from .notes import router as notes_router
+from .coaches import router as coaches_router
 
 __all__ = [
     "auth_router",
@@ -16,4 +17,5 @@ __all__ = [
     "gamification_router",
     "reports_router",
     "notes_router",
+    "coaches_router",
 ]

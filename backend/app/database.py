@@ -37,6 +37,9 @@ def init_database() -> None:
     from .models.skill_reference_pose import SkillReferencePose  # noqa: F401
     from .models.achievement import AthleteAchievement  # noqa: F401
     from .models.coach_note import CoachNote  # noqa: F401
+    from .models.coach_connection_request import CoachConnectionRequest  # noqa: F401
+    from .models.coach_invite import CoachInvite  # noqa: F401
+    from .models.password_reset_token import PasswordResetToken  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 

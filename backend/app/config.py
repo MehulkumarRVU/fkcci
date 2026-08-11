@@ -25,6 +25,17 @@ class Settings(BaseSettings):
     CORS_ALLOWED_ORIGINS: List[str] = Field(default_factory=lambda: ["*"])
     ENV: str = Field("development")
 
+    # Password reset email delivery. If SMTP_HOST is unset, reset links are
+    # logged server-side instead of emailed - lets password reset be tested
+    # locally before real SMTP credentials are configured.
+    SMTP_HOST: Optional[str] = Field(None)
+    SMTP_PORT: int = Field(587)
+    SMTP_USERNAME: Optional[str] = Field(None)
+    SMTP_PASSWORD: Optional[str] = Field(None)
+    SMTP_FROM_EMAIL: Optional[str] = Field(None)
+    SMTP_USE_TLS: bool = Field(True)
+    FRONTEND_BASE_URL: str = Field("http://localhost:3000")
+
     @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
     @classmethod
     def split_cors_origins(cls, v):

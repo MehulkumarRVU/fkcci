@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     currentCoach = athlete;
     loadCoachSummary();
     loadAthletes();
+    loadInviteCode();
+    loadPendingRequests();
 
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
@@ -64,6 +66,108 @@ async function loadCoachSummary() {
     } catch (error) {
         console.error('Error loading coach summary:', error);
         showAlert('Failed to load summary data', 'error');
+    }
+}
+
+/**
+ * Load (or note the absence of) this coach's active invite code.
+ */
+async function loadInviteCode() {
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/coaches/me/invite-code`);
+        if (!response.ok) return;
+        const data = await response.json();
+        document.getElementById('inviteCodeValue').textContent = data ? data.code : 'No active code yet';
+    } catch (error) {
+        console.error('Error loading invite code:', error);
+    }
+}
+
+const regenerateInviteCodeBtn = document.getElementById('regenerateInviteCodeBtn');
+if (regenerateInviteCodeBtn) {
+    regenerateInviteCodeBtn.addEventListener('click', async () => {
+        regenerateInviteCodeBtn.disabled = true;
+        try {
+            const response = await fetchWithAuth(`${API_BASE_URL}/coaches/me/invite-code`, { method: 'POST' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            document.getElementById('inviteCodeValue').textContent = data.code;
+            showAlert('New invite code generated. The old code no longer works.', 'success');
+        } catch (error) {
+            console.error('Error generating invite code:', error);
+            showAlert('Failed to generate invite code', 'error');
+        } finally {
+            regenerateInviteCodeBtn.disabled = false;
+        }
+    });
+}
+
+const copyInviteCodeBtn = document.getElementById('copyInviteCodeBtn');
+if (copyInviteCodeBtn) {
+    copyInviteCodeBtn.addEventListener('click', async () => {
+        const code = document.getElementById('inviteCodeValue').textContent;
+        if (!code || code === '-' || code === 'No active code yet') return;
+        try {
+            await navigator.clipboard.writeText(code);
+            showAlert('Invite code copied to clipboard', 'success');
+        } catch (error) {
+            console.error('Error copying invite code:', error);
+        }
+    });
+}
+
+/**
+ * Load pending athlete connection requests awaiting this coach's decision.
+ */
+async function loadPendingRequests() {
+    const container = document.getElementById('pendingRequestsContainer');
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/coaches/me/requests`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const requests = await response.json();
+
+        if (!requests || requests.length === 0) {
+            container.innerHTML = `<div class="card"><p style="color: var(--text-secondary);">No pending requests.</p></div>`;
+            return;
+        }
+
+        container.innerHTML = `<div class="card">${requests.map(r => `
+            <div class="flex justify-between align-center" style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+                <span>${r.athlete ? r.athlete.username : `Athlete #${r.athlete_id}`}</span>
+                <div class="flex gap-2">
+                    <button class="btn btn-primary btn-small" data-accept="${r.id}">Accept</button>
+                    <button class="btn btn-outline btn-small" data-reject="${r.id}">Reject</button>
+                </div>
+            </div>
+        `).join('')}</div>`;
+
+        container.querySelectorAll('button[data-accept]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                await respondToRequest(btn.dataset.accept, 'accept');
+            });
+        });
+        container.querySelectorAll('button[data-reject]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                await respondToRequest(btn.dataset.reject, 'reject');
+            });
+        });
+    } catch (error) {
+        console.error('Error loading pending requests:', error);
+        container.innerHTML = `<div class="card"><p style="color: var(--danger-color);">Failed to load pending requests.</p></div>`;
+    }
+}
+
+async function respondToRequest(requestId, action) {
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/coaches/requests/${requestId}/${action}`, { method: 'POST' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        showAlert(action === 'accept' ? 'Athlete connected!' : 'Request rejected.', 'success');
+        await loadPendingRequests();
+        await loadAthletes();
+        await loadCoachSummary();
+    } catch (error) {
+        console.error(`Error responding to request:`, error);
+        showAlert('Failed to respond to request', 'error');
     }
 }
 
@@ -141,9 +245,12 @@ function displayAthletes(athletes) {
                     <value>${formatDate(athlete.created_at)}</value>
                 </div>
             </div>
-            <div class="athlete-footer">
+            <div class="athlete-footer flex gap-2">
                 <button class="btn-view-details" onclick="viewAthleteDetails(${athlete.id})">
                     View Detailed Report
+                </button>
+                <button class="btn btn-outline btn-small" onclick="disconnectAthlete(${athlete.id}, '${athlete.username}')">
+                    Disconnect
                 </button>
             </div>
         </div>
@@ -206,6 +313,24 @@ function displayTopPerformers(topPerformers) {
             `).join('')}
         </div>
     `;
+}
+
+/**
+ * Disconnect an athlete from this coach (referenced via inline onclick
+ * from the athlete card - see displayAthletes).
+ */
+async function disconnectAthlete(athleteId, username) {
+    if (!confirm(`Disconnect ${username} from your athletes?`)) return;
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/coaches/me/athletes/${athleteId}`, { method: 'DELETE' });
+        if (!response.ok && response.status !== 204) throw new Error(`HTTP ${response.status}`);
+        showAlert(`${username} disconnected.`, 'success');
+        await loadAthletes();
+        await loadCoachSummary();
+    } catch (error) {
+        console.error('Error disconnecting athlete:', error);
+        showAlert('Failed to disconnect athlete', 'error');
+    }
 }
 
 /**
