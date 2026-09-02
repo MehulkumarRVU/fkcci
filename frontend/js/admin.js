@@ -5,10 +5,13 @@ let coachAthletes = [];
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    const token = localStorage.getItem('token');
-    const athlete = JSON.parse(localStorage.getItem('athlete') || '{}');
+    if (!getAuthToken()) {
+        window.location.href = '../index.html';
+        return;
+    }
 
-    if (!token || athlete.role !== 'coach') {
+    const athlete = JSON.parse(localStorage.getItem('athlete') || '{}');
+    if (athlete.role !== 'coach') {
         window.location.href = '../index.html';
         return;
     }
@@ -16,6 +19,19 @@ document.addEventListener('DOMContentLoaded', () => {
     currentCoach = athlete;
     loadCoachSummary();
     loadAthletes();
+    loadInviteCode();
+    loadPendingRequests();
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        // Previously an inline onclick="logout()" called a function that
+        // was never defined anywhere in the app - the button silently did
+        // nothing. Wired to the same working pattern every other page uses.
+        logoutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleUnauthorized();
+        });
+    }
 });
 
 /**
@@ -23,11 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 async function loadCoachSummary() {
     try {
-        const response = await fetch(`${API_BASE_URL}/analytics/coach/summary`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/summary`);
 
         if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                return handleUnauthorized();
+            }
             throw new Error(`HTTP ${response.status}`);
         }
 
@@ -53,13 +70,120 @@ async function loadCoachSummary() {
 }
 
 /**
+ * Load (or note the absence of) this coach's active invite code.
+ */
+async function loadInviteCode() {
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/coaches/me/invite-code`);
+        if (!response.ok) return;
+        const data = await response.json();
+        document.getElementById('inviteCodeValue').textContent = data ? data.code : 'No active code yet';
+    } catch (error) {
+        console.error('Error loading invite code:', error);
+    }
+}
+
+const regenerateInviteCodeBtn = document.getElementById('regenerateInviteCodeBtn');
+if (regenerateInviteCodeBtn) {
+    regenerateInviteCodeBtn.addEventListener('click', async () => {
+        regenerateInviteCodeBtn.disabled = true;
+        try {
+            const response = await fetchWithAuth(`${API_BASE_URL}/coaches/me/invite-code`, { method: 'POST' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            document.getElementById('inviteCodeValue').textContent = data.code;
+            showAlert('New invite code generated. The old code no longer works.', 'success');
+        } catch (error) {
+            console.error('Error generating invite code:', error);
+            showAlert('Failed to generate invite code', 'error');
+        } finally {
+            regenerateInviteCodeBtn.disabled = false;
+        }
+    });
+}
+
+const copyInviteCodeBtn = document.getElementById('copyInviteCodeBtn');
+if (copyInviteCodeBtn) {
+    copyInviteCodeBtn.addEventListener('click', async () => {
+        const code = document.getElementById('inviteCodeValue').textContent;
+        if (!code || code === '-' || code === 'No active code yet') return;
+        try {
+            await navigator.clipboard.writeText(code);
+            showAlert('Invite code copied to clipboard', 'success');
+        } catch (error) {
+            console.error('Error copying invite code:', error);
+        }
+    });
+}
+
+/**
+ * Load pending athlete connection requests awaiting this coach's decision.
+ */
+async function loadPendingRequests() {
+    const container = document.getElementById('pendingRequestsContainer');
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/coaches/me/requests`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const requests = await response.json();
+
+        if (!requests || requests.length === 0) {
+            container.innerHTML = `<div class="card"><p style="color: var(--text-secondary);">No pending requests.</p></div>`;
+            return;
+        }
+
+        container.innerHTML = `<div class="card">${requests.map(r => `
+            <div class="flex justify-between align-center" style="padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+                <span>${r.athlete ? r.athlete.username : `Athlete #${r.athlete_id}`}</span>
+                <div class="flex gap-2">
+                    <button class="btn btn-primary btn-small" data-accept="${r.id}">Accept</button>
+                    <button class="btn btn-outline btn-small" data-reject="${r.id}">Reject</button>
+                </div>
+            </div>
+        `).join('')}</div>`;
+
+        container.querySelectorAll('button[data-accept]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                await respondToRequest(btn.dataset.accept, 'accept');
+            });
+        });
+        container.querySelectorAll('button[data-reject]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                await respondToRequest(btn.dataset.reject, 'reject');
+            });
+        });
+    } catch (error) {
+        console.error('Error loading pending requests:', error);
+        container.innerHTML = `<div class="card"><p style="color: var(--danger-color);">Failed to load pending requests.</p></div>`;
+    }
+}
+
+async function respondToRequest(requestId, action) {
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/coaches/requests/${requestId}/${action}`, { method: 'POST' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        showAlert(action === 'accept' ? 'Athlete connected!' : 'Request rejected.', 'success');
+        await loadPendingRequests();
+        await loadAthletes();
+        await loadCoachSummary();
+    } catch (error) {
+        console.error(`Error responding to request:`, error);
+        showAlert('Failed to respond to request', 'error');
+    }
+}
+
+/**
  * Load all athletes coached by current coach
  */
 async function loadAthletes() {
     try {
-        const response = await fetch(`${API_BASE_URL}/analytics/coach/athletes`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/athletes`);
+
+        if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                return handleUnauthorized();
+            }
+            throw new Error(`HTTP ${response.status}`);
+        }
 
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
@@ -121,9 +245,12 @@ function displayAthletes(athletes) {
                     <value>${formatDate(athlete.created_at)}</value>
                 </div>
             </div>
-            <div class="athlete-footer">
+            <div class="athlete-footer flex gap-2">
                 <button class="btn-view-details" onclick="viewAthleteDetails(${athlete.id})">
                     View Detailed Report
+                </button>
+                <button class="btn btn-outline btn-small" onclick="disconnectAthlete(${athlete.id}, '${athlete.username}')">
+                    Disconnect
                 </button>
             </div>
         </div>
@@ -140,16 +267,19 @@ function displayAthletes(athletes) {
  */
 async function loadAthleteMonthlyStats(athleteId) {
     try {
-        const response = await fetch(`${API_BASE_URL}/analytics/coach/athlete/${athleteId}/monthly-report`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/athlete/${athleteId}/monthly-report`);
 
-        if (response.ok) {
-            const data = await response.json();
-            const element = document.getElementById(`sessions-${athleteId}`);
-            if (element) {
-                element.textContent = data.this_month_sessions;
+        if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                return handleUnauthorized();
             }
+            return;
+        }
+
+        const data = await response.json();
+        const element = document.getElementById(`sessions-${athleteId}`);
+        if (element) {
+            element.textContent = data.this_month_sessions;
         }
     } catch (error) {
         console.error(`Error loading stats for athlete ${athleteId}:`, error);
@@ -186,6 +316,24 @@ function displayTopPerformers(topPerformers) {
 }
 
 /**
+ * Disconnect an athlete from this coach (referenced via inline onclick
+ * from the athlete card - see displayAthletes).
+ */
+async function disconnectAthlete(athleteId, username) {
+    if (!confirm(`Disconnect ${username} from your athletes?`)) return;
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/coaches/me/athletes/${athleteId}`, { method: 'DELETE' });
+        if (!response.ok && response.status !== 204) throw new Error(`HTTP ${response.status}`);
+        showAlert(`${username} disconnected.`, 'success');
+        await loadAthletes();
+        await loadCoachSummary();
+    } catch (error) {
+        console.error('Error disconnecting athlete:', error);
+        showAlert('Failed to disconnect athlete', 'error');
+    }
+}
+
+/**
  * View detailed report for an athlete
  */
 async function viewAthleteDetails(athleteId) {
@@ -193,11 +341,12 @@ async function viewAthleteDetails(athleteId) {
     modal.classList.add('show');
 
     try {
-        const response = await fetch(`${API_BASE_URL}/analytics/coach/athlete/${athleteId}/monthly-report`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/athlete/${athleteId}/monthly-report`);
 
         if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+                return handleUnauthorized();
+            }
             throw new Error(`HTTP ${response.status}`);
         }
 
@@ -223,8 +372,11 @@ function displayAthleteDetails(report) {
     const html = `
         <!-- Profile Section -->
         <div class="detail-section">
-            <h3>👤 Athlete Profile</h3>
-            <div class="stats-grid">
+            <div class="flex justify-between align-center">
+                <h3 style="margin: 0; border: none; padding: 0;">👤 Athlete Profile</h3>
+                <button class="btn btn-outline btn-small" onclick="downloadCoachReportPdf(${report.athlete_id}, '${report.athlete_username}')">📄 Download PDF</button>
+            </div>
+            <div class="stats-grid" style="margin-top: 15px;">
                 <div class="stat-box">
                     <label>Skill Level</label>
                     <value>${report.skill_level}</value>
@@ -273,7 +425,7 @@ function displayAthleteDetails(report) {
                 </div>
                 <div class="stat-box">
                     <label>Reaction Score</label>
-                    <value>${stats.avg_reaction_score.toFixed(1)}%</value>
+                    <value>${stats.avg_reaction_score !== null && stats.avg_reaction_score !== undefined ? stats.avg_reaction_score.toFixed(1) + '%' : 'N/A'}</value>
                 </div>
                 <div class="stat-box">
                     <label>Balance Score</label>
@@ -350,9 +502,84 @@ function displayAthleteDetails(report) {
                 ${generateCoachingFeedback(stats)}
             </div>
         </div>
+
+        <!-- Coach Notes Section -->
+        <div class="detail-section">
+            <h3>📝 Coach Notes</h3>
+            <div id="notesThread" class="notes-thread">
+                <p style="color: var(--text-secondary);">Loading notes...</p>
+            </div>
+            <div class="notes-composer">
+                <textarea id="noteComposerInput" class="form-textarea" placeholder="Leave a note for this athlete..."></textarea>
+                <button id="noteComposerSendBtn" class="btn btn-primary">Send</button>
+            </div>
+        </div>
     `;
 
     document.getElementById('modalBody').innerHTML = html;
+    loadNotesForModal(report.athlete_id);
+}
+
+/**
+ * Load and render the coach<->athlete notes thread inside the currently
+ * open detail modal, and wire the composer's send button.
+ */
+async function loadNotesForModal(athleteId) {
+    const threadEl = document.getElementById('notesThread');
+    const sendBtn = document.getElementById('noteComposerSendBtn');
+    const input = document.getElementById('noteComposerInput');
+    if (!threadEl) return;
+
+    async function refresh() {
+        try {
+            const response = await fetchWithAuth(`${API_BASE_URL}/notes/athlete/${athleteId}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const notes = await response.json();
+
+            threadEl.innerHTML = notes.length === 0
+                ? '<p style="color: var(--text-secondary);">No notes yet - start the conversation below.</p>'
+                : notes.map(n => `
+                    <div class="note-bubble ${n.is_coach ? 'from-coach' : 'from-athlete'}">
+                        <div class="note-meta">${n.author_username} (${n.is_coach ? 'Coach' : 'Athlete'}) - ${new Date(n.created_at).toLocaleString()}</div>
+                        <div class="note-message"></div>
+                    </div>
+                `).join('');
+
+            // Set message text via textContent (not template interpolation)
+            // to avoid rendering athlete/coach-authored note content as HTML.
+            const bubbles = threadEl.querySelectorAll('.note-message');
+            notes.forEach((n, i) => { if (bubbles[i]) bubbles[i].textContent = n.message; });
+
+            threadEl.scrollTop = threadEl.scrollHeight;
+        } catch (error) {
+            console.error('Error loading notes:', error);
+            threadEl.innerHTML = '<p style="color: var(--danger-color);">Failed to load notes.</p>';
+        }
+    }
+
+    if (sendBtn) {
+        sendBtn.onclick = async () => {
+            const message = input.value.trim();
+            if (!message) return;
+            sendBtn.disabled = true;
+            try {
+                const response = await fetchWithAuth(`${API_BASE_URL}/notes/athlete/${athleteId}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ message }),
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                input.value = '';
+                await refresh();
+            } catch (error) {
+                console.error('Error posting note:', error);
+                showAlert('Failed to send note', 'error');
+            } finally {
+                sendBtn.disabled = false;
+            }
+        };
+    }
+
+    await refresh();
 }
 
 /**
@@ -446,3 +673,16 @@ document.addEventListener('click', (e) => {
         closeModal();
     }
 });
+
+/**
+ * Download a coach's PDF report for one athlete (referenced via inline
+ * onclick from the athlete detail modal - see displayAthleteDetails).
+ */
+async function downloadCoachReportPdf(athleteId, username) {
+    try {
+        await downloadFile(`${API_BASE_URL}/reports/coach/athlete/${athleteId}/pdf`, `${username}_coach_report.pdf`);
+    } catch (error) {
+        console.error('Error downloading coach report:', error);
+        showAlert('Failed to download report', 'error');
+    }
+}

@@ -8,9 +8,21 @@ from sqlalchemy import func
 from ..database import get_db
 from ..models.session import Session as SessionModel
 from ..models.athlete import Athlete
+from ..services.profile_twin_service import get_athlete_twin
 from .auth import get_current_athlete
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
+
+
+@router.get("/me/profile-twin")
+async def get_my_profile_twin(
+    current_athlete: Athlete = Depends(get_current_athlete),
+    db: Session = Depends(get_db)
+):
+    """The athlete's persistent 'digital twin': score-over-time trend and
+    recurring joint-deviation tendencies aggregated across their session
+    history."""
+    return get_athlete_twin(current_athlete.id, db)
 
 
 # Pydantic Models
@@ -25,7 +37,7 @@ class SessionSummary(BaseModel):
     is_completed: bool
     performance_score: float
     technique_accuracy: float
-    reaction_score: float
+    reaction_score: Optional[float] = None
     balance_score: float
 
     class Config:
@@ -39,7 +51,7 @@ class MonthlyStats(BaseModel):
     completed_sessions: int
     avg_performance_score: float
     avg_technique_accuracy: float
-    avg_reaction_score: float
+    avg_reaction_score: Optional[float] = None
     avg_balance_score: float
     highest_performance: float
     lowest_performance: float
@@ -91,13 +103,10 @@ async def get_coach_athletes(
     ]
 
 
-@router.get("/coach/athlete/{athlete_id}/monthly-report", response_model=AthleteReport)
-async def get_athlete_monthly_report(
-    athlete_id: int,
-    current_athlete: Athlete = Depends(get_current_athlete),
-    db: Session = Depends(get_db)
-):
-    """Get detailed monthly report for an athlete (coach only)"""
+def build_athlete_monthly_report(athlete_id: int, current_athlete: Athlete, db: Session) -> AthleteReport:
+    """Shared data-gathering for the monthly report - used by both the JSON
+    endpoint below and the coach PDF export route, so the 30-day aggregation
+    logic exists in exactly one place."""
     if current_athlete.role != "coach":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -129,11 +138,15 @@ async def get_athlete_monthly_report(
 
     # Calculate monthly statistics
     completed_sessions = [s for s in recent_sessions if s.is_completed]
-    
+
     if completed_sessions:
         avg_perf = sum(s.performance_score for s in completed_sessions) / len(completed_sessions)
         avg_tech = sum(s.technique_accuracy for s in completed_sessions) / len(completed_sessions)
-        avg_react = sum(s.reaction_score for s in completed_sessions) / len(completed_sessions)
+        # reaction_score is nullable (honest "not measured" instead of a
+        # fabricated number) - average only over sessions where it was
+        # actually measured.
+        measured_reactions = [s.reaction_score for s in completed_sessions if s.reaction_score is not None]
+        avg_react = sum(measured_reactions) / len(measured_reactions) if measured_reactions else None
         avg_balance = sum(s.balance_score for s in completed_sessions) / len(completed_sessions)
         highest_perf = max(s.performance_score for s in completed_sessions)
         lowest_perf = min(s.performance_score for s in completed_sessions)
@@ -150,7 +163,7 @@ async def get_athlete_monthly_report(
         completed_sessions=len(completed_sessions),
         avg_performance_score=round(avg_perf, 2),
         avg_technique_accuracy=round(avg_tech, 2),
-        avg_reaction_score=round(avg_react, 2),
+        avg_reaction_score=round(avg_react, 2) if avg_react is not None else None,
         avg_balance_score=round(avg_balance, 2),
         highest_performance=round(highest_perf, 2),
         lowest_performance=round(lowest_perf, 2),
@@ -188,6 +201,16 @@ async def get_athlete_monthly_report(
         monthly_stats=monthly_stats,
         recent_sessions=recent_summary
     )
+
+
+@router.get("/coach/athlete/{athlete_id}/monthly-report", response_model=AthleteReport)
+async def get_athlete_monthly_report(
+    athlete_id: int,
+    current_athlete: Athlete = Depends(get_current_athlete),
+    db: Session = Depends(get_db)
+):
+    """Get detailed monthly report for an athlete (coach only)"""
+    return build_athlete_monthly_report(athlete_id, current_athlete, db)
 
 
 @router.get("/coach/summary")

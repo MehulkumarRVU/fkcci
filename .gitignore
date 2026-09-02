@@ -1,4 +1,9 @@
-# Python
+.env
+*.pyc
+__pycache__/
+pocketcoach.db
+db.sqlite3
+.venv/# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -56,3 +61,4 @@ Thumbs.db
 # Temporary files
 *.tmp
 temp/
+.claude/

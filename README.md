@@ -2,7 +2,9 @@
 
 **AI-Powered Real-Time Sports Technique Coach**
 
-PocketCoach AI is an intelligent training system that uses device cameras and AI pose detection to provide real-time feedback for **Table Tennis 🏓** and **Boxing 🥊** athletes. Perfect for beginners, intermediate, and advanced athletes looking to improve their technique, reaction time, and overall performance.
+PocketCoach AI is an intelligent training system that uses device cameras and AI pose detection to provide real-time feedback for **Table Tennis 🏓**, **Boxing 🥊**, and a growing set of indoor sports. Perfect for beginners, intermediate, and advanced athletes looking to improve their technique, reaction time, and overall performance.
+
+Phase 1 UI now includes indoor sports integration with enhanced dashboard, session setup, profile management, and live training flow.
 
 ---
 
@@ -20,38 +22,82 @@ PocketCoach AI is an intelligent training system that uses device cameras and AI
 - Balance & Stability Metrics
 - Overall Performance Rating
 
-### 🏓 Table Tennis Module
-**Skills Supported:**
-- Forehand Drive
-- Backhand Drive
-- Topspin & Backspin
-- Serve Technique
-- Side Shuffle Footwork
-- Smash
+### � Supported Sports & Drills
+PocketCoach AI supports a broad set of indoor sports and training categories. Detailed skill drills are currently seeded for Table Tennis, Boxing, and Badminton, while additional supported sports are available with baseline technique drills.
 
-**Analysis Includes:**
-- Shoulder-Elbow-Wrist angles
-- Knee flexion
-- Hip rotation
-- Stance width
-- Swing arc path
-- Weight transfer
+#### Sports with detailed drills
+- **Table Tennis 🏓**
+  - Forehand Drive
+  - Backhand Drive
+  - Topspin
+  - Backspin
+  - Serve Technique
+  - Side Shuffle Footwork
+  - Smash
+- **Boxing 🥊**
+  - Jab
+  - Cross
+  - Hook
+  - Uppercut
+  - Guard Position
+  - Slip & Roll
+  - Pivot Footwork
+- **Badminton 🏸**
+  - Serve Technique
+  - Clear
+  - Smash
+  - Drop Shot
+  - Net Play
+  - Split Step Footwork
 
-### 🥊 Boxing Module
-**Skills Supported:**
-- Jab, Cross, Hook, Uppercut
-- Guard Position
-- Slip & Roll Defense
-- Pivot Footwork
-- Combination Drills
+#### Additional supported sports
+- Tennis 🎾
+- Pickleball 🥎
+- Squash 🏓
+- Kickboxing 🥊
+- Muay Thai 🦵
+- Karate 🥋
+- Taekwondo 🥋
+- Judo 🥋
+- Brazilian Jiu-Jitsu 🥋
+- Wrestling 🤼
+- Fencing 🤺
+- Basketball 🏀
+- Volleyball 🏐
+- Handball 🤾
+- Indoor Archery 🏹
+- AI Gym Coach 🏋️
+- Stretching 🤸
+- Mobility Training 🦴
+- Rehabilitation 🩺
+- Home Workouts 🏠
+- Calisthenics 💪
 
-**Analysis Includes:**
-- Punch extension angles
-- Shoulder & hip rotation
-- Guard hand height
-- Foot pivot alignment
-- Balance stability
-- Recovery speed
+> For each additional supported sport, PocketCoach seeds a baseline drill named **Basic &lt;sport&gt; Technique** to provide a starting point for technique analysis and future drill expansion.
+
+---
+
+## 🏗️ Architecture
+
+### Docker & Cloud Readiness
+- Added `backend/Dockerfile` for containerized FastAPI deployment.
+- Added `docker-compose.yml` with `backend`, `postgres`, `redis`, and `nginx` services.
+- Added `.dockerignore` to reduce build context size.
+- Added `nginx.conf` for reverse proxying frontend requests to the backend.
+
+### Running with Docker
+1. Copy `.env.example` to `.env` and set `SECRET_KEY`.
+2. Start services:
+   ```bash
+   docker compose up --build
+   ```
+3. Backend API is available at `http://localhost:8080`.
+4. Nginx reverse proxy is available at `http://localhost`.
+
+### Environment variables
+- `DATABASE_URL` can point to PostgreSQL using `postgresql+psycopg2://user:password@host:port/dbname`
+- `REDIS_URL` enables Redis-backed rate limiting
+- `CORS_ALLOWED_ORIGINS` controls allowed origins for the API
 
 ---
 
@@ -118,6 +164,35 @@ pocket-coach/
 ## 🚀 Getting Started
 
 ### Prerequisites
+
+## Development
+
+- Backend: see `backend/`
+- Frontend: see `frontend/`
+
+Local dev (recommended):
+
+1. Copy `.env.example` to `.env` and set `SECRET_KEY` to a secure random value.
+
+2. Create and activate a virtualenv, then install deps:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\Activate.ps1 on Windows
+pip install -r backend/requirements.txt
+pip install -r backend/dev-requirements.txt
+```
+
+3. Run the backend and tests (helper script starts server, waits for /health, runs pytest):
+
+```bash
+# Linux/macOS
+bash backend/scripts/start_server_for_tests.sh &
+python -m pytest -q
+
+# Windows (PowerShell helper)
+powershell -ExecutionPolicy Bypass -File backend/scripts/run_tests_with_server.ps1
+```
 - Python 3.8 or higher
 - Modern web browser (Chrome, Firefox, Edge)
 - Webcam access

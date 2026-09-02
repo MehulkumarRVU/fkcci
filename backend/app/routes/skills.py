@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models.skill import Skill
+from ..models.skill_reference_pose import SkillReferencePose
+from ..dependencies import require_role
+from ..seed_data import seed_default_skills_if_empty
 
 router = APIRouter(prefix="/api/skills", tags=["Skills"])
 
@@ -71,8 +74,39 @@ async def get_skill(skill_id: int, db: Session = Depends(get_db)):
     return skill
 
 
+@router.get("/{skill_id}/reference-pose")
+async def get_skill_reference_pose(
+    skill_id: int,
+    skill_level: str = Query("beginner", description="beginner / intermediate / advanced"),
+    db: Session = Depends(get_db)
+):
+    """Documented ideal-form joint-angle ranges for a skill (Digital Twin
+    overlay). Live per-frame deviation classification doesn't read this
+    table - it reuses the analyzer's own thresholds directly - this is the
+    human-readable reference a coach UI can display."""
+    reference = (
+        db.query(SkillReferencePose)
+        .filter(SkillReferencePose.skill_id == skill_id, SkillReferencePose.skill_level == skill_level)
+        .first()
+    )
+    if not reference:
+        raise HTTPException(status_code=404, detail="No reference pose available for this skill/level yet")
+
+    return {
+        "skill_id": reference.skill_id,
+        "skill_level": reference.skill_level,
+        "checkpoint_name": reference.checkpoint_name,
+        "joint_angle_ranges": reference.joint_angle_ranges,
+        "notes": reference.notes,
+    }
+
+
 @router.post("/", response_model=SkillResponse, status_code=status.HTTP_201_CREATED)
-async def create_skill(skill_data: SkillCreate, db: Session = Depends(get_db)):
+async def create_skill(
+    skill_data: SkillCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(require_role("coach", "admin")),
+):
     """Create a new skill (Admin function)"""
     # Check if skill name already exists
     existing_skill = db.query(Skill).filter(Skill.name == skill_data.name).first()
@@ -83,10 +117,12 @@ async def create_skill(skill_data: SkillCreate, db: Session = Depends(get_db)):
         )
     
     # Validate sport type
-    if skill_data.sport_type not in ["table_tennis", "boxing"]:
+    from ..sports_registry import is_valid_sport
+
+    if not is_valid_sport(skill_data.sport_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="sport_type must be 'table_tennis' or 'boxing'"
+            detail="Invalid sport_type"
         )
     
     new_skill = Skill(**skill_data.dict())
@@ -100,12 +136,19 @@ async def create_skill(skill_data: SkillCreate, db: Session = Depends(get_db)):
 @router.post("/seed")
 async def seed_skills(db: Session = Depends(get_db)):
     """Seed the database with default skills"""
-    # Check if skills already exist
-    existing_skills = db.query(Skill).count()
-    if existing_skills > 0:
-        return {"message": f"Skills already seeded. Current count: {existing_skills}"}
-    
-    # Table Tennis Skills
+    # Allow skill seeding for development and initial data population.
+    result = seed_default_skills_if_empty(db)
+    if result["already_seeded"]:
+        return {"message": f"Skills already seeded. Current count: {result['existing_skills']}"}
+
+    return {
+        "message": "Added missing default skills",
+        "added_skills": result["added_skills"],
+        "existing_skills": result["existing_skills"],
+        "generic_skills": result["generic_skills"]
+    }
+
+# Table Tennis Skills
     table_tennis_skills = [
         {
             "name": "Forehand Drive",
@@ -251,9 +294,96 @@ async def seed_skills(db: Session = Depends(get_db)):
             "primary_focus": "accuracy"
         }
     ]
+
+    # Badminton Skills
+    badminton_skills = [
+        {
+            "name": "Serve Technique",
+            "sport_type": "badminton",
+            "description": "Correct racket preparation and toss for consistent serves",
+            "technique_tips": "Use a relaxed grip, maintain a high wrist, and aim for precise contact.",
+            "common_mistakes": "Tossing too low, swinging too hard, or failing to follow through.",
+            "safety_warning": "Avoid overstraining the shoulder with excessive power.",
+            "difficulty_level": "beginner",
+            "primary_focus": "accuracy"
+        },
+        {
+            "name": "Clear",
+            "sport_type": "badminton",
+            "description": "Deep defensive shot to the backcourt",
+            "technique_tips": "Swing the racket high and use wrist snap while rotating the body.",
+            "common_mistakes": "Hitting too flat, poor timing, or insufficient follow-through.",
+            "difficulty_level": "intermediate",
+            "primary_focus": "power"
+        },
+        {
+            "name": "Smash",
+            "sport_type": "badminton",
+            "description": "Fast attacking shot directed downwards",
+            "technique_tips": "Prepare with a high backswing, strike at the highest point, and follow through.",
+            "common_mistakes": "Poor contact point, weak follow-through, or blocked wrist.",
+            "difficulty_level": "advanced",
+            "primary_focus": "power"
+        },
+        {
+            "name": "Drop Shot",
+            "sport_type": "badminton",
+            "description": "Soft touch shot that falls just over the net",
+            "technique_tips": "Use gentle wrist action and disguise the shot until the last moment.",
+            "common_mistakes": "Hitting too hard or keeping the racket face open.",
+            "difficulty_level": "intermediate",
+            "primary_focus": "control"
+        },
+        {
+            "name": "Net Play",
+            "sport_type": "badminton",
+            "description": "Tactical play close to the net",
+            "technique_tips": "Stay low, keep the racket in front, and use soft touch.",
+            "common_mistakes": "Backing away from the net or pushing the shuttle too hard.",
+            "difficulty_level": "intermediate",
+            "primary_focus": "precision"
+        },
+        {
+            "name": "Split Step Footwork",
+            "sport_type": "badminton",
+            "description": "Ready movement before each shot",
+            "technique_tips": "Jump lightly and be ready to move in any direction.",
+            "common_mistakes": "Reacting late or staying flat-footed.",
+            "difficulty_level": "beginner",
+            "primary_focus": "speed"
+        },
+        {
+            "name": "Defensive Block",
+            "sport_type": "badminton",
+            "description": "Controlled defensive strokes to return fast shots",
+            "technique_tips": "Keep the racket face stable and absorb speed with a soft grip.",
+            "common_mistakes": "Overpowering the shot or losing control.",
+            "difficulty_level": "intermediate",
+            "primary_focus": "defense"
+        }
+    ]
     
     # Add all skills
-    all_skills = table_tennis_skills + boxing_skills
+    all_skills = table_tennis_skills + boxing_skills + badminton_skills
+
+    # Fallback generic skills for other supported sports
+    seeded_sport_types = {skill_data["sport_type"] for skill_data in all_skills}
+    generic_skills = []
+    for sport_type, sport_info in SUPPORTED_SPORTS.items():
+        if sport_type not in seeded_sport_types:
+            generic_skills.append({
+                "name": f"Basic {sport_info['name']} Technique",
+                "sport_type": sport_type,
+                "description": f"Fundamental {sport_info['name']} technique to build consistency and control.",
+                "technique_tips": f"Focus on the core movement pattern for {sport_info['name']} and maintain steady form.",
+                "common_mistakes": "Poor posture, inconsistent timing, and lack of focus on fundamentals.",
+                "safety_warning": "Move slowly until form is stable and avoid overexertion.",
+                "difficulty_level": "beginner",
+                "primary_focus": "accuracy"
+            })
+
+    all_skills.extend(generic_skills)
+
     for skill_data in all_skills:
         skill = Skill(**skill_data)
         db.add(skill)
@@ -264,5 +394,7 @@ async def seed_skills(db: Session = Depends(get_db)):
         "message": "Skills seeded successfully",
         "table_tennis_skills": len(table_tennis_skills),
         "boxing_skills": len(boxing_skills),
+        "badminton_skills": len(badminton_skills),
+        "generic_skills": len(generic_skills),
         "total_skills": len(all_skills)
     }

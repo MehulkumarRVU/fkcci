@@ -36,8 +36,11 @@
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
             </form>
+            <p class="text-center mt-2">
+                <a href="forgot-password.html" style="color: var(--text-secondary); font-size: 0.9rem;">Forgot Password?</a>
+            </p>
             <p class="text-center mt-3">
-                Don't have an account? 
+                Don't have an account?
                 <a href="#" id="showSignupLink" style="color: var(--primary-color); font-weight: 500;">Sign Up</a>
             </p>
         </div>
@@ -68,11 +71,33 @@
                 <div id="athleteFields">
                     <div class="form-group">
                         <label class="form-label" for="sportType">Select Your Sport</label>
-                        <select id="sportType" class="form-select" required>
-                            <option value="">Choose a sport...</option>
-                            <option value="table_tennis">🏓 Table Tennis</option>
-                            <option value="boxing">🥊 Boxing</option>
-                        </select>
+                            <select id="sportType" class="form-select" required>
+                                <option value="">Choose a sport...</option>
+                                <option value="table_tennis">🏓 Table Tennis</option>
+                                <option value="boxing">🥊 Boxing</option>
+                                <option value="badminton">🏸 Badminton</option>
+                                <option value="tennis">🎾 Tennis</option>
+                                <option value="pickleball">🥎 Pickleball</option>
+                                <option value="squash">🏓 Squash</option>
+                                <option value="kickboxing">🥊 Kickboxing</option>
+                                <option value="muay_thai">🦵 Muay Thai</option>
+                                <option value="karate">🥋 Karate</option>
+                                <option value="taekwondo">🥋 Taekwondo</option>
+                                <option value="judo">🥋 Judo</option>
+                                <option value="bjj">🥋 Brazilian Jiu-Jitsu (BJJ)</option>
+                                <option value="wrestling">🤼 Wrestling</option>
+                                <option value="fencing">🤺 Fencing</option>
+                                <option value="basketball">🏀 Basketball</option>
+                                <option value="volleyball">🏐 Volleyball</option>
+                                <option value="handball">🤾 Handball</option>
+                                <option value="indoor_archery">🏹 Indoor Archery</option>
+                                <option value="ai_gym_coach">🏋️ AI Gym Coach</option>
+                                <option value="stretching">🤸 Stretching</option>
+                                <option value="mobility_training">🦴 Mobility Training</option>
+                                <option value="rehabilitation">🩺 Rehabilitation</option>
+                                <option value="home_workouts">🏠 Home Workouts</option>
+                                <option value="calisthenics">💪 Calisthenics</option>
+                            </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="skillLevel">Skill Level</label>
@@ -114,6 +139,7 @@
         </div>
     </div>
 
-    <script src="../js/auth.js"></script>
+    <script src="../js/auth-utils.js?v=2"></script>
+    <script src="../js/auth.js?v=2"></script>
 </body>
 </html>

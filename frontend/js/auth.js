@@ -56,25 +56,43 @@ if (loginFormElement) {
         const password = document.getElementById('loginPassword').value;
 
         try {
-            // Create FormData for OAuth2 password flow
-            const formData = new FormData();
+            // Create URLSearchParams for OAuth2 password flow
+            const formData = new URLSearchParams();
+            formData.append('grant_type', 'password');
             formData.append('username', username);
             formData.append('password', password);
 
+            console.log('auth.js login payload:', formData.toString());
+
             const response = await fetch(`${API_URL}/api/auth/login`, {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData.toString()
             });
 
+            const responseText = await response.text();
+            console.log('auth.js login response status:', response.status, 'body:', responseText);
+
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.detail || 'Login failed');
+                let errorMessage = 'Login failed';
+                try {
+                    const errorData = JSON.parse(responseText);
+                    errorMessage = errorData.detail || errorMessage;
+                } catch (parseError) {
+                    errorMessage = responseText || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
 
-            const data = await response.json();
+            const data = JSON.parse(responseText);
             
-            // Store token
+            // Store token and refresh token
             localStorage.setItem('token', data.access_token);
+            if (data.refresh_token) {
+                localStorage.setItem('refresh_token', data.refresh_token);
+            }
 
             // Get athlete info
             const athleteResponse = await fetch(`${API_URL}/api/auth/me`, {
@@ -113,6 +131,17 @@ if (signupFormElement) {
 
         try {
             let response;
+            console.log('auth.js signup payload:', {
+                accountType,
+                email,
+                username,
+                password,
+                sportType: document.getElementById('sportType').value,
+                skillLevel: document.getElementById('skillLevel').value,
+                dominantHand: document.getElementById('dominantHand').value,
+                height: document.getElementById('height').value,
+                weight: document.getElementById('weight').value,
+            });
 
             if (accountType === 'coach') {
                 // Coach signup
@@ -198,6 +227,70 @@ function showAlert(message, type = 'info') {
     }, 5000);
 }
 
+async function refreshAccessToken() {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) {
+        return false;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/auth/token/refresh`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ refresh_token: refreshToken })
+        });
+
+        if (!response.ok) {
+            return false;
+        }
+
+        const data = await response.json();
+        localStorage.setItem('token', data.access_token);
+        if (data.refresh_token) {
+            localStorage.setItem('refresh_token', data.refresh_token);
+        }
+        return true;
+    } catch (error) {
+        console.error('Error refreshing access token:', error);
+        return false;
+    }
+}
+
+async function fetchWithAuth(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    const token = localStorage.getItem('token');
+    if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+    }
+
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401 || response.status === 403) {
+        if (await refreshAccessToken()) {
+            const retryHeaders = new Headers(options.headers || {});
+            retryHeaders.set('Authorization', `Bearer ${localStorage.getItem('token')}`);
+            if (options.body && !(options.body instanceof FormData) && !retryHeaders.has('Content-Type')) {
+                retryHeaders.set('Content-Type', 'application/json');
+            }
+            return fetch(url, { ...options, headers: retryHeaders });
+        }
+        handleUnauthorized();
+    }
+    return response;
+}
+
+function handleUnauthorized() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('athlete');
+    localStorage.removeItem('refresh_token');
+    window.location.href = 'login.html';
+}
+
 // Check if already logged in
 // Check if already logged in
 if (localStorage.getItem('token')) {
@@ -210,11 +303,7 @@ if (localStorage.getItem('token')) {
             window.location.href = 'dashboard.html';
         } else {
             // try to populate athlete info from the backend
-            fetch(`${API_URL}/api/auth/me`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            })
+            fetchWithAuth(`${API_URL}/api/auth/me`)
             .then(res => {
                 if (!res.ok) throw new Error('Not authenticated');
                 return res.json();
@@ -226,9 +315,12 @@ if (localStorage.getItem('token')) {
             .catch(() => {
                 // Token invalid or fetch failed — clear token and remain on login
                 localStorage.removeItem('token');
+                localStorage.removeItem('athlete');
+                localStorage.removeItem('refresh_token');
             });
         }
     }
 }
 
 console.log('Auth module loaded');
+

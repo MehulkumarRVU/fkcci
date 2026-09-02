@@ -46,7 +46,9 @@
                     </div>
                     <div>
                         <strong>Connected Sports:</strong>
-                        <p id="profileLinkedSports">-</p>
+                        <select id="profileLinkedSportsInfo" class="form-select" multiple disabled>
+                            <option value="">Loading...</option>
+                        </select>
                     </div>
                     <div>
                         <strong>Skill Level:</strong>
@@ -68,6 +70,39 @@
                         <strong>Performance Rating:</strong>
                         <p id="profilePerformance" class="score-display" style="font-size: 1.5rem; margin: 0;">-</p>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coach Connection (athletes only) -->
+        <div class="card mt-4 hidden" id="coachConnectionCard">
+            <h3 class="card-header">🧑‍🏫 Coach Connection</h3>
+            <div class="card-body">
+                <div id="coachConnUnconnected">
+                    <p style="color: var(--text-secondary);">You don't have a coach yet. Search for one or join with an invite code.</p>
+                    <div class="form-group">
+                        <label class="form-label" for="coachSearchInput">Search coaches by username</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="coachSearchInput" class="form-input" placeholder="e.g. coach_jane">
+                            <button id="coachSearchBtn" class="btn btn-outline" type="button">Search</button>
+                        </div>
+                        <div id="coachSearchResults" class="mt-2"></div>
+                    </div>
+                    <div class="form-group mt-3">
+                        <label class="form-label" for="inviteCodeInput">Have an invite code?</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="inviteCodeInput" class="form-input" placeholder="Enter code">
+                            <button id="joinInviteBtn" class="btn btn-primary" type="button">Join</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="coachConnPending" class="hidden">
+                    <p>Your request to <strong id="pendingCoachName">-</strong> is pending approval.</p>
+                    <button id="cancelRequestBtn" class="btn btn-outline btn-small" type="button">Cancel Request</button>
+                </div>
+                <div id="coachConnConnected" class="hidden">
+                    <p>You're connected with coach <strong id="connectedCoachName">-</strong>.</p>
+                    <button id="leaveCoachBtn" class="btn btn-danger btn-small" type="button">Disconnect</button>
                 </div>
             </div>
         </div>
@@ -99,17 +134,16 @@
             <h3 class="card-header">Training Preferences</h3>
             <form id="updatePreferencesForm">
                 <div class="form-group">
-                    <label class="form-label">Connected Sports</label>
-                    <div class="flex gap-2">
-                        <label><input type="checkbox" id="linkBoxing" value="boxing"> 🥊 Boxing</label>
-                        <label><input type="checkbox" id="linkTableTennis" value="table_tennis"> 🏓 Table Tennis</label>
+                    <label class="form-label" for="profileLinkedSportsDropdown">Connected Sports</label>
+                    <div class="checkbox-dropdown" id="profileLinkedSportsDropdown">
+                        <button type="button" class="dropdown-toggle" id="linkedSportsToggle">Select connected sports</button>
+                        <div class="dropdown-menu" id="linkedSportsMenu"></div>
                     </div>
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="updateActiveSport">Active Sport</label>
                     <select id="updateActiveSport" class="form-select">
-                        <option value="boxing">🥊 Boxing</option>
-                        <option value="table_tennis">🏓 Table Tennis</option>
+                        <option value="">Select a connected sport</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -133,20 +167,52 @@
 
         <!-- Training Statistics -->
         <div class="card mt-4">
-            <h3 class="card-header">Training Statistics</h3>
+            <div class="flex justify-between align-center card-header" style="border-bottom: none; margin-bottom: 0;">
+                <span>Training Statistics</span>
+                <button id="downloadProgressPdfBtn" class="btn btn-outline btn-small">📄 Download PDF</button>
+            </div>
             <div class="stats-grid">
-                <div class="stat-card">
+                <div class="stat-card stat-card-primary">
                     <span class="stat-value" id="statTotalSessions">0</span>
                     <span class="stat-label">Total Sessions</span>
                 </div>
-                <div class="stat-card" style="background: linear-gradient(135deg, var(--secondary-color), #059669);">
+                <div class="stat-card stat-card-secondary">
                     <span class="stat-value" id="statAvgPerformance">0</span>
                     <span class="stat-label">Avg Performance</span>
                 </div>
             </div>
         </div>
+
+        <!-- Digital Twin: score-over-time trend + recurring tendencies,
+             aggregated across session history by the backend profile-twin service. -->
+        <div class="card mt-4">
+            <h3 class="card-header">🧬 Your Digital Twin</h3>
+            <div class="card-body">
+                <div id="twinEmptyState" style="color: var(--text-secondary);">
+                    Complete a few training sessions to build your digital twin profile.
+                </div>
+                <div id="twinContent" class="hidden">
+                    <div class="flex justify-between align-center mb-2">
+                        <strong>Performance Trend</strong>
+                        <span id="twinTrendDirection" style="font-weight: 500;">-</span>
+                    </div>
+                    <canvas id="twinTrendCanvas" width="700" height="140" style="width:100%; height:140px; background: var(--light-bg); border-radius: 0.5rem;"></canvas>
+
+                    <div class="mt-3">
+                        <strong>Per-Sport Averages</strong>
+                        <div id="twinPerSport" class="mt-2"></div>
+                    </div>
+
+                    <div class="mt-3">
+                        <strong>Recurring Tendencies</strong>
+                        <ul id="twinTendencies" style="margin-top: 0.5rem;"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
+    <script src="../js/auth-utils.js"></script>
     <script>
         // Show admin link for coaches
         document.addEventListener('DOMContentLoaded', function() {

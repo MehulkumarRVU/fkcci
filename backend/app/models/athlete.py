@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, Date, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from ..database import Base
@@ -29,7 +29,12 @@ class Athlete(Base):
     membership_tier = Column(String, default="free")  # free / pro
     total_sessions = Column(Integer, default=0)
     performance_rating = Column(Float, default=0.0)  # 0-100
-    
+
+    # Gamification
+    current_streak = Column(Integer, default=0)  # consecutive days with a completed session
+    longest_streak = Column(Integer, default=0)
+    last_session_date = Column(Date, nullable=True)  # date of the most recent completed session
+
     # Status
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
