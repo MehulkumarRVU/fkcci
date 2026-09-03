@@ -18,6 +18,22 @@ let isPaused = false;
 let pausedAccumulatedMs = 0;
 let pauseStartedAt = null;
 let repCounter = null;
+let audioCoachingEnabled = false;
+let lastSpokenText = null;
+let lastSpokenAt = 0;
+const AUDIO_MIN_GAP_MS = 4000;
+
+// Live score display is driven only by real backend analysis (never the
+// client-side "immediate feedback" heuristic, which starts at 100 and only
+// subtracts for detected problems - a neutral idle pose triggers no
+// problem checks and so reads as a high score despite no real technique
+// having been performed). A small rolling window of the last few backend
+// responses is averaged before display too, since single frames are noisy
+// (MediaPipe landmark jitter can flip a threshold check frame to frame)
+// and looked like "random numbers" without it.
+const LIVE_SCORE_WINDOW = 5;
+const LIVE_SCORE_MIN_SAMPLES = 2;
+let liveScoreSamples = { overall: [], technique: [], reaction: [], balance: [] };
 
 // Warn before an accidental tab close/refresh loses an in-progress
 // session - no per-frame data is persisted to the backend mid-session, so
@@ -88,15 +104,32 @@ async function initLiveSession() {
     skeleton3D = new Skeleton3D(document.getElementById('skeleton3dContainer'));
 
     repCounter = new RepCounter(athlete.sport_type, currentSkill.name, athlete.dominant_hand);
+    repCounter.setTargetReps(activeSession.targetReps || null);
     if (repCounter.hasCounter()) {
         document.getElementById('liveCountCard').classList.remove('hidden');
         document.getElementById('liveCountLabel').textContent = repCounter.getLabel();
-        document.getElementById('liveCountValue').textContent = '0';
+        updateLiveCountDisplay();
     }
 
     const toggle3dBtn = document.getElementById('toggle3dBtn');
     if (toggle3dBtn) {
         toggle3dBtn.addEventListener('click', toggle3dView);
+    }
+
+    const toggleIsolateBtn = document.getElementById('toggleIsolateBtn');
+    if (toggleIsolateBtn) {
+        toggleIsolateBtn.addEventListener('click', () => {
+            const enabled = !poseDetector.isolateSubject;
+            poseDetector.setIsolateSubject(enabled);
+            toggleIsolateBtn.textContent = enabled
+                ? '🫥 Isolate Subject: On'
+                : '🫥 Isolate Subject (Hide Background)';
+        });
+    }
+
+    const toggleAudioBtn = document.getElementById('toggleAudioBtn');
+    if (toggleAudioBtn) {
+        toggleAudioBtn.addEventListener('click', toggleAudioCoaching);
     }
 
     await poseDetector.initialize(
@@ -201,6 +234,10 @@ function pauseSession() {
     badge.classList.remove('hidden');
     badge.style.display = 'flex';
     setCameraStatus('Session paused. Analysis and scoring are on hold.');
+
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
 }
 
 function resumeSession() {
@@ -219,15 +256,47 @@ function resumeSession() {
     setCameraStatus('Camera active. Pose detection is running.');
 }
 
+function toggleAudioCoaching() {
+    audioCoachingEnabled = !audioCoachingEnabled;
+    const btn = document.getElementById('toggleAudioBtn');
+    btn.textContent = audioCoachingEnabled ? '🔊 Audio Coaching: On' : '🔊 Audio Coaching: Off';
+    if (!audioCoachingEnabled && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
+}
+
+// Speaks the top feedback message, throttled so it doesn't chatter
+// constantly given analysis runs multiple times per second: only speaks
+// when the message actually changed and at most once per
+// AUDIO_MIN_GAP_MS.
+function speakFeedback(feedbackList) {
+    if (!audioCoachingEnabled || !feedbackList || feedbackList.length === 0) return;
+    if (!('speechSynthesis' in window)) return;
+
+    const text = feedbackList[0].replace(/[\u{1F300}-\u{1FAFF}☀-➿]/gu, '').trim();
+    if (!text) return;
+
+    const now = Date.now();
+    if (text === lastSpokenText || now - lastSpokenAt < AUDIO_MIN_GAP_MS) return;
+
+    lastSpokenText = text;
+    lastSpokenAt = now;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+}
+
 function onPoseResults(landmarks) {
     if (isPaused) return;
 
     const localAnalysis = sportsAnalyzer.analyzeLocally(landmarks, currentSkill.name);
 
-    updateLiveScore(localAnalysis.score, localAnalysis.score, 0, localAnalysis.score);
-
+    // Feedback tips (text) are still shown instantly - they're just
+    // pass/fail hints, not a fabricated accuracy percentage. The numeric
+    // score display is driven only by real backend analysis; see
+    // sendToBackendForAnalysis().
     const feedbackPanel = document.getElementById('feedbackPanel');
     feedbackPanel.innerHTML = sportsAnalyzer.formatFeedback(localAnalysis.feedback);
+    speakFeedback(localAnalysis.feedback);
 
     sportsAnalyzer.addFeedback(localAnalysis.feedback, localAnalysis.score);
 
@@ -239,7 +308,7 @@ function onPoseResults(landmarks) {
 
     if (repCounter && repCounter.hasCounter()) {
         repCounter.update(landmarks);
-        document.getElementById('liveCountValue').textContent = repCounter.getCount();
+        updateLiveCountDisplay();
     }
 
     // Downsampled buffer used at session end for a real, backend-computed
@@ -268,14 +337,14 @@ async function sendToBackendForAnalysis(landmarks) {
         });
 
         if (response.ok) {
+            // The session may have been paused while this request was in
+            // flight - discard a late response rather than updating the
+            // score/feedback panel after the UI already shows "paused".
+            if (isPaused) return;
+
             const analysis = await response.json();
             sportsAnalyzer.addServerResult(analysis);
-            updateLiveScore(
-                analysis.score,
-                analysis.technique_accuracy,
-                analysis.reaction_score || 0,
-                analysis.balance_score
-            );
+            recordLiveScoreSample(analysis.score, analysis.technique_accuracy, analysis.reaction_score, analysis.balance_score);
 
             // Ideal-form overlay: color-codes the 3D skeleton's joints from
             // the backend's own deviation classification (reuses the
@@ -302,10 +371,50 @@ function handleUnauthorized() {
     window.location.href = 'login.html';
 }
 
+function updateLiveCountDisplay() {
+    const valueEl = document.getElementById('liveCountValue');
+    const bannerEl = document.getElementById('goalReachedBanner');
+    const count = repCounter.getCount();
+
+    valueEl.textContent = repCounter.targetReps !== null ? `${count} / ${repCounter.targetReps}` : count;
+
+    if (repCounter.goalReached()) {
+        bannerEl.classList.remove('hidden');
+    }
+}
+
+function rollingAverage(samples, newValue) {
+    if (typeof newValue === 'number') {
+        samples.push(newValue);
+        if (samples.length > LIVE_SCORE_WINDOW) samples.shift();
+    }
+    if (samples.length === 0) return null;
+    return samples.reduce((a, b) => a + b, 0) / samples.length;
+}
+
+// Feeds one real backend analysis result into the rolling window and
+// updates the live display once there's enough signal to show a number
+// that isn't just a single noisy frame.
+function recordLiveScoreSample(overall, technique, reaction, balance) {
+    const smoothedOverall = rollingAverage(liveScoreSamples.overall, overall);
+    const smoothedTechnique = rollingAverage(liveScoreSamples.technique, technique);
+    const smoothedReaction = rollingAverage(liveScoreSamples.reaction, reaction ?? null);
+    const smoothedBalance = rollingAverage(liveScoreSamples.balance, balance);
+
+    if (liveScoreSamples.overall.length < LIVE_SCORE_MIN_SAMPLES) {
+        document.getElementById('liveScoreStatus').textContent =
+            `Analyzing your form... (${liveScoreSamples.overall.length}/${LIVE_SCORE_MIN_SAMPLES})`;
+        return;
+    }
+
+    document.getElementById('liveScoreStatus').textContent = '';
+    updateLiveScore(smoothedOverall, smoothedTechnique, smoothedReaction, smoothedBalance);
+}
+
 function updateLiveScore(overall, technique, reaction, balance) {
     document.getElementById('liveScore').textContent = Math.round(overall);
     document.getElementById('liveTechnique').textContent = Math.round(technique);
-    document.getElementById('liveReaction').textContent = Math.round(reaction);
+    document.getElementById('liveReaction').textContent = reaction === null ? 'N/A' : Math.round(reaction);
     document.getElementById('liveBalance').textContent = Math.round(balance);
 
     const scoreDisplay = document.getElementById('liveScore');
@@ -330,6 +439,10 @@ async function endSession() {
     if (!confirm('Are you sure you want to end this session?')) return;
 
     stopCamera();
+
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
 
     if (sessionTimer) {
         clearInterval(sessionTimer);

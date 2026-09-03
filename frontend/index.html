@@ -14,6 +14,8 @@
             <ul class="navbar-nav">
                 <li><a href="#features">Features</a></li>
                 <li><a href="#sports">Sports</a></li>
+                <li><a href="pages/demo.html">Try Demo</a></li>
+                <li><a href="pages/for-coaches.html">For Coaches</a></li>
                 <li><a href="pages/login.html" class="btn btn-primary">Get Started</a></li>
             </ul>
         </div>
@@ -23,9 +25,12 @@
     <section class="hero">
         <div class="container">
             <h1>Your AI-Powered Sports Coach</h1>
-            <p>Real-time technique correction for Table Tennis, Boxing & Badminton athletes</p>
+            <p>Real-time technique correction across 37 sports, from racket sports to martial arts to fitness training</p>
             <p>Master your form. Improve your performance. Train smarter.</p>
-            <a href="pages/login.html" class="btn btn-large btn-secondary">Start Training Now</a>
+            <div class="flex gap-2 justify-center mt-2">
+                <a href="pages/login.html" class="btn btn-large btn-secondary">Start Training Now</a>
+                <a href="pages/demo.html" class="btn btn-large btn-outline" style="border-color: white; color: white;">Try It Live (No Sign Up)</a>
+            </div>
         </div>
     </section>
 
@@ -34,6 +39,10 @@
         <!-- Sports Selection -->
         <section id="sports">
             <h2 class="text-center mb-4">Choose Your Sport</h2>
+            <p class="text-center mb-4" style="color: var(--text-secondary);">
+                Start with one of our three flagship sports below, or pick from 34 more.
+            </p>
+
             <div class="sport-cards">
                 <!-- Table Tennis Card -->
                 <div class="sport-card table-tennis">
@@ -79,6 +88,8 @@
                     <a href="pages/login.html" class="btn btn-primary">Train Badminton</a>
                 </div>
             </div>
+
+            <div id="moreSportsContainer" class="mt-4"></div>
         </section>
 
         <!-- Features Section -->

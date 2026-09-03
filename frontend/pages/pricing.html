@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing - PocketCoach AI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="navbar-brand">🎯 PocketCoach AI</a>
+            <ul class="navbar-nav">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li id="adminLink" style="display: none;"><a href="admin.html">Coach Analytics</a></li>
+                <li><a href="session.html">Start Session</a></li>
+                <li><a href="profile.html">Profile</a></li>
+                <li><a href="pricing.html">Pricing</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-danger">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="padding: 2rem; max-width: 900px;">
+        <h1 class="text-center mb-2">Plans &amp; Pricing</h1>
+        <p class="text-center mb-4" style="color: var(--text-secondary);">
+            Your current plan: <strong id="currentTierLabel">-</strong>
+        </p>
+
+        <div class="grid grid-2 gap-3">
+            <div class="card">
+                <h2 class="card-header">Free</h2>
+                <p style="font-size: 2rem; font-weight: 700; margin: 0.5rem 0;">$0</p>
+                <ul style="padding-left: 1.25rem; color: var(--text-secondary); line-height: 1.8;">
+                    <li><strong>5 training sessions</strong> per 30 days</li>
+                    <li>Coach connections (search, invite code)</li>
+                    <li>Gamification: streaks &amp; achievements</li>
+                    <li>PDF progress &amp; coach reports</li>
+                    <li>Digital Twin: live 3D skeleton, ideal-form overlay, profile trends</li>
+                    <li>Live rep/combo/jump counting</li>
+                </ul>
+                <button class="btn btn-outline" style="width: 100%;" disabled>Current Plan</button>
+            </div>
+
+            <div class="card" style="border: 2px solid var(--primary-color);">
+                <h2 class="card-header">Pro</h2>
+                <p style="font-size: 2rem; font-weight: 700; margin: 0.5rem 0;">Coming soon</p>
+                <ul style="padding-left: 1.25rem; color: var(--text-secondary); line-height: 1.8;">
+                    <li><strong>Unlimited training sessions</strong></li>
+                    <li>Everything in Free</li>
+                    <li>Priority support</li>
+                </ul>
+                <button class="btn btn-primary" id="upgradeBtn" style="width: 100%;" disabled>🚧 Payments coming soon</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/auth-utils.js"></script>
+    <script src="../js/pricing.js"></script>
+</body>
+</html>

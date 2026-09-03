@@ -1,6 +1,7 @@
 import sys
 import os
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
@@ -39,6 +40,18 @@ def _get_reset_token_for(username):
 def test_request_returns_generic_message_for_existing_email():
     _signup("reset_athlete_1")
     resp = client.post("/api/auth/password-reset/request", json={"email": "reset_athlete_1@example.com"})
+    assert resp.status_code == 200
+    assert "sent" in resp.json()["message"].lower()
+
+
+def test_request_survives_smtp_failure_without_500():
+    """A misconfigured/rejected SMTP send (bad credentials, network error,
+    etc.) must not crash the request or reveal to the caller that sending
+    failed - the reset token is still created, and an admin finds out via
+    the server-side log instead."""
+    _signup("reset_athlete_smtp")
+    with patch("app.routes.auth.send_password_reset_email", side_effect=Exception("SMTP down")):
+        resp = client.post("/api/auth/password-reset/request", json={"email": "reset_athlete_smtp@example.com"})
     assert resp.status_code == 200
     assert "sent" in resp.json()["message"].lower()
 

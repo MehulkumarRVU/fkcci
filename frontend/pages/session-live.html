@@ -18,6 +18,7 @@
                 <li><a href="session.html">Start Session</a></li>
                 <li id="adminLink" style="display: none;"><a href="admin.html">Admin</a></li>
                 <li><a href="profile.html">Profile</a></li>
+                <li><a href="pricing.html">Pricing</a></li>
                 <li><a href="#" id="logoutBtn" class="btn btn-danger">Logout</a></li>
             </ul>
         </div>
@@ -42,7 +43,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-2 gap-3">
+            <div class="grid grid-video gap-3">
                 <div>
                     <div class="video-container" style="position: relative;">
                         <video id="webcam" autoplay playsinline muted></video>
@@ -68,6 +69,16 @@
                                 🧍 Show Digital Twin (3D Skeleton)
                             </button>
                         </div>
+                        <div class="flex justify-center align-center mt-2">
+                            <button id="toggleIsolateBtn" class="btn btn-secondary" style="width: 100%;">
+                                🫥 Isolate Subject (Hide Background)
+                            </button>
+                        </div>
+                        <div class="flex justify-center align-center mt-2">
+                            <button id="toggleAudioBtn" class="btn btn-secondary" style="width: 100%;">
+                                🔊 Audio Coaching: Off
+                            </button>
+                        </div>
                     </div>
 
                     <div class="card mt-3">
@@ -77,22 +88,24 @@
                     <div class="card mt-3 hidden text-center" id="liveCountCard">
                         <span id="liveCountLabel" style="font-weight: 500; color: var(--text-secondary);">Count</span>
                         <div style="font-size: 2rem; font-weight: bold;" id="liveCountValue">0</div>
+                        <p id="goalReachedBanner" class="hidden" style="margin: 0.5rem 0 0 0; color: var(--success-color); font-weight: 600;">🎉 Goal reached!</p>
                     </div>
 
                     <div class="card mt-3">
                         <h4 class="text-center">Current Performance</h4>
-                        <div class="score-display excellent" id="liveScore">0</div>
+                        <div class="score-display" id="liveScore">–</div>
+                        <p id="liveScoreStatus" class="text-center" style="color: var(--text-secondary); font-size: 0.85rem; margin: 0.25rem 0 0 0;">Analyzing your form...</p>
                         <div class="grid grid-3 gap-2 text-center mt-3">
                             <div>
-                                <div style="font-size: 1.5rem; font-weight: bold;" id="liveTechnique">0</div>
+                                <div style="font-size: 1.5rem; font-weight: bold;" id="liveTechnique">–</div>
                                 <div style="font-size: 0.875rem; color: var(--text-secondary);">Technique</div>
                             </div>
                             <div>
-                                <div style="font-size: 1.5rem; font-weight: bold;" id="liveReaction">0</div>
+                                <div style="font-size: 1.5rem; font-weight: bold;" id="liveReaction">–</div>
                                 <div style="font-size: 0.875rem; color: var(--text-secondary);">Reaction</div>
                             </div>
                             <div>
-                                <div style="font-size: 1.5rem; font-weight: bold;" id="liveBalance">0</div>
+                                <div style="font-size: 1.5rem; font-weight: bold;" id="liveBalance">–</div>
                                 <div style="font-size: 0.875rem; color: var(--text-secondary);">Balance</div>
                             </div>
                         </div>

@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional
 from ..base_analyzer import BaseAnalyzer
+from ..shared.mirroring import get_dominant_and_off_side
 from ..shared.thresholds import scale_penalty
 from ..shared.utils import PoseUtils
 
@@ -15,12 +16,17 @@ class BasketballAnalyzer(BaseAnalyzer):
 
         left_knee = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["LEFT_KNEE"])
         right_knee = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_KNEE"])
-        right_wrist = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_WRIST"])
-        right_elbow = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_ELBOW"])
+        # Shooting arm resolved from the athlete's dominant_hand - previously
+        # this hardcoded RIGHT_WRIST/RIGHT_ELBOW regardless of dominant_hand,
+        # so a left-handed athlete's shooting form was graded off their
+        # non-shooting arm.
+        shooting_side, _off_side, _side_label = get_dominant_and_off_side(landmarks, dominant_hand)
+        shooting_wrist = shooting_side.wrist
+        shooting_elbow = shooting_side.elbow
 
         # Shooting elbow alignment: elbow should be above wrist
-        if PoseUtils.is_confident(right_wrist) and PoseUtils.is_confident(right_elbow):
-            if right_wrist["y"] < right_elbow["y"]:
+        if PoseUtils.is_confident(shooting_wrist) and PoseUtils.is_confident(shooting_elbow):
+            if shooting_wrist["y"] < shooting_elbow["y"]:
                 feedback.append("✅ Elbow/wrist alignment good for shooting.")
             else:
                 feedback.append("⚠️ Adjust elbow position for better shooting form.")

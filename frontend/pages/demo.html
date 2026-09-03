@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Try the Demo - PocketCoach AI</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="../index.html" class="navbar-brand">🎯 PocketCoach AI</a>
+            <ul class="navbar-nav">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="login.html" class="btn btn-primary">Get Started</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container" style="padding: 2rem;">
+        <h1 class="text-center mb-2">Try the Live Demo</h1>
+        <p class="text-center mb-4" style="color: var(--text-secondary);">
+            No account needed — turn on your camera and see PocketCoach AI's pose tracking in action. Nothing here is saved.
+        </p>
+
+        <div class="grid grid-video gap-3">
+            <div>
+                <div class="card">
+                    <h3>Camera Feed</h3>
+                    <div class="video-container">
+                        <video id="webcam" autoplay playsinline muted></video>
+                        <canvas id="poseCanvas" class="video-canvas"></canvas>
+                    </div>
+                    <div class="mt-3 flex justify-between align-center">
+                        <button id="startBtn" class="btn btn-primary">Start Camera</button>
+                        <button id="stopBtn" class="btn btn-danger hidden">Stop Camera</button>
+                        <div>
+                            <strong>FPS:</strong> <span id="fps">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <h3>Try a Sport</h3>
+                    <div class="form-group">
+                        <label class="form-label" for="sportType">Sport</label>
+                        <select id="sportType" class="form-select">
+                            <option value="boxing">🥊 Boxing</option>
+                            <option value="table_tennis">🏓 Table Tennis</option>
+                            <option value="badminton">🏸 Badminton</option>
+                            <option value="ai_gym_coach">🏋️ AI Gym Coach</option>
+                            <option value="basketball">🏀 Basketball</option>
+                            <option value="karate">🥋 Karate</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <h3>Body Detection</h3>
+                    <div id="landmarkStatus" class="alert alert-info">
+                        Waiting for camera...
+                    </div>
+                    <div class="grid grid-2 gap-2 mt-3">
+                        <div class="text-center">
+                            <div id="visibleCount" style="font-size: 2rem; font-weight: bold;">0</div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">Visible Landmarks</div>
+                        </div>
+                        <div class="text-center">
+                            <div id="confidence" style="font-size: 2rem; font-weight: bold;">0%</div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">Confidence</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <h3>Live Score</h3>
+                    <div class="score-display excellent" id="demoScore">0</div>
+                    <div id="demoFeedback" style="margin-top: 1rem;">
+                        <p style="color: var(--text-secondary);">Start the camera to see feedback...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-4">
+            <h2>Like what you see?</h2>
+            <p style="color: var(--text-secondary);">Sign up to save your sessions, track progress over time, and connect with a coach.</p>
+            <a href="login.html" class="btn btn-large btn-primary mt-2">Create Your Free Account</a>
+        </div>
+    </div>
+
+    <script src="../js/pose-thresholds.js"></script>
+    <script src="../js/pose-detection.js"></script>
+    <script src="../js/sports-analyzer.js"></script>
+    <script src="../js/demo.js"></script>
+</body>
+</html>

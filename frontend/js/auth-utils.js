@@ -63,7 +63,12 @@ async function fetchWithAuth(url, options = {}) {
     }
 
     const response = await fetch(url, { ...options, headers });
-    if (response.status === 401 || response.status === 403) {
+    // Only 401 means "your credentials are invalid/expired" - 403 means
+    // "you're authenticated but not authorized for this specific resource"
+    // (wrong role, don't own it, etc.), a legitimate business-logic
+    // rejection that should flow back to the caller as a normal error, not
+    // force-log-out a perfectly valid session.
+    if (response.status === 401) {
         if (await refreshAccessToken()) {
             const retryHeaders = new Headers(options.headers || {});
             retryHeaders.set('Authorization', `Bearer ${getAuthToken()}`);
@@ -104,6 +109,22 @@ async function downloadFile(url, filename) {
     document.body.removeChild(link);
     URL.revokeObjectURL(objectUrl);
 }
+
+// Auto-wires every .password-toggle-btn on the page (login, signup, and
+// reset-password forms) to show/hide its paired password field - one
+// generic listener instead of per-page duplication.
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.password-toggle-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const input = document.getElementById(btn.dataset.toggleFor);
+            if (!input) return;
+            const showing = input.type === 'text';
+            input.type = showing ? 'password' : 'text';
+            btn.textContent = showing ? '👁️' : '🙈';
+            btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+        });
+    });
+});
 
 window.getAuthToken = getAuthToken;
 window.fetchWithAuth = fetchWithAuth;

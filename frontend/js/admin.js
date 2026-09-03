@@ -42,7 +42,7 @@ async function loadCoachSummary() {
         const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/summary`);
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
+            if (response.status === 401) {
                 return handleUnauthorized();
             }
             throw new Error(`HTTP ${response.status}`);
@@ -179,7 +179,7 @@ async function loadAthletes() {
         const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/athletes`);
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
+            if (response.status === 401) {
                 return handleUnauthorized();
             }
             throw new Error(`HTTP ${response.status}`);
@@ -270,7 +270,7 @@ async function loadAthleteMonthlyStats(athleteId) {
         const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/athlete/${athleteId}/monthly-report`);
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
+            if (response.status === 401) {
                 return handleUnauthorized();
             }
             return;
@@ -344,7 +344,7 @@ async function viewAthleteDetails(athleteId) {
         const response = await fetchWithAuth(`${API_BASE_URL}/analytics/coach/athlete/${athleteId}/monthly-report`);
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
+            if (response.status === 401) {
                 return handleUnauthorized();
             }
             throw new Error(`HTTP ${response.status}`);

@@ -4,10 +4,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..models.athlete import Athlete
 from ..models.skill import Skill
 from ..models.skill_reference_pose import SkillReferencePose
 from ..dependencies import require_role
 from ..seed_data import seed_default_skills_if_empty
+from .auth import get_current_athlete
 
 router = APIRouter(prefix="/api/skills", tags=["Skills"])
 
@@ -134,9 +136,17 @@ async def create_skill(
 
 
 @router.post("/seed")
-async def seed_skills(db: Session = Depends(get_db)):
-    """Seed the database with default skills"""
-    # Allow skill seeding for development and initial data population.
+async def seed_skills(
+    current_athlete: Athlete = Depends(get_current_athlete),
+    db: Session = Depends(get_db),
+):
+    """Seed the database with default skills.
+
+    Requires a logged-in athlete/coach (not role-restricted) rather than
+    being open to anyone - the frontend calls this automatically the first
+    time a sport with no seeded skills is loaded (see session.js's
+    loadSkills()), which normal athletes legitimately trigger, but it was
+    previously reachable with no authentication at all."""
     result = seed_default_skills_if_empty(db)
     if result["already_seeded"]:
         return {"message": f"Skills already seeded. Current count: {result['existing_skills']}"}

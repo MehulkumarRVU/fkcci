@@ -136,7 +136,7 @@ class SportsAnalyzer {
     }
 
     analyzeBoxingLocal(landmarks, skillName, feedback) {
-        // Check guard position
+        // Guard check applies regardless of which skill is being drilled.
         const leftWrist = landmarks[15];
         const rightWrist = landmarks[16];
         const leftShoulder = landmarks[11];
@@ -144,10 +144,75 @@ class SportsAnalyzer {
 
         if (leftWrist && rightWrist && leftShoulder && rightShoulder) {
             const avgShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-            
-            // Hands should be at or above shoulder level
             if (leftWrist.y > avgShoulderY + 0.1 || rightWrist.y > avgShoulderY + 0.1) {
                 feedback.push('❌ Keep hands up - protect your face');
+            } else {
+                feedback.push('✅ Good guard position');
+            }
+        }
+
+        // Skill-specific checks - previously skillName was accepted but
+        // never read, so every boxing skill (Jab, Cross, Hook, Uppercut...)
+        // showed the exact same single guard-position message.
+        const skill = (skillName || '').toLowerCase();
+        const leftElbow = landmarks[13];
+        const rightElbow = landmarks[14];
+        // Jab/Cross/Hook/Uppercut/Slip all need the full arm chain (plus
+        // shoulders) confidently visible - MediaPipe can drop a landmark on
+        // partial occlusion, and calculateAngle throws on an undefined point.
+        // Pivot/Footwork below only needs hips, so it's checked separately
+        // rather than being gated behind arm visibility too.
+        const armLandmarksReady = leftShoulder && rightShoulder && leftElbow && rightElbow && leftWrist && rightWrist;
+        const needsArms = skill.includes('jab') || skill.includes('cross') || skill.includes('hook')
+            || skill.includes('uppercut') || skill.includes('slip') || skill.includes('roll');
+
+        if (needsArms && !armLandmarksReady) {
+            // Not enough of the arm is visible to grade this skill this
+            // frame - skip rather than risk a throw on a missing point.
+        } else if (skill.includes('jab') || skill.includes('cross')) {
+            const leftAngle = this.calculateAngle(leftShoulder, leftElbow, leftWrist);
+            const rightAngle = this.calculateAngle(rightShoulder, rightElbow, rightWrist);
+            const extension = Math.max(leftAngle, rightAngle);
+            if (extension > 160) {
+                feedback.push(`✅ Full extension on your ${skillName.toLowerCase()}`);
+            } else if (extension > 140) {
+                feedback.push(`⚠️ ${skillName} not fully extended - punch straighter through the target`);
+            } else {
+                feedback.push(`❌ ${skillName} too short - snap your arm fully out`);
+            }
+        } else if (skill.includes('hook')) {
+            const leftAngle = this.calculateAngle(leftShoulder, leftElbow, leftWrist);
+            const rightAngle = this.calculateAngle(rightShoulder, rightElbow, rightWrist);
+            // Whichever elbow is closer to the ~90° hook bend is the hooking arm.
+            const hookAngle = Math.abs(leftAngle - 90) < Math.abs(rightAngle - 90) ? leftAngle : rightAngle;
+            if (hookAngle >= 80 && hookAngle <= 100) {
+                feedback.push('✅ Good 90° elbow bend for your hook');
+            } else if (hookAngle < 80) {
+                feedback.push('⚠️ Hook elbow too tight - open up closer to a 90° bend');
+            } else {
+                feedback.push('⚠️ Hook elbow too wide - tuck in closer to a 90° bend');
+            }
+        } else if (skill.includes('uppercut')) {
+            if (leftWrist.y < leftShoulder.y || rightWrist.y < rightShoulder.y) {
+                feedback.push('✅ Good upward drive on your uppercut');
+            } else {
+                feedback.push('⚠️ Drive your uppercut upward through the target, not across');
+            }
+        } else if (skill.includes('slip') || skill.includes('roll')) {
+            const nose = landmarks[0];
+            const midShoulderX = (leftShoulder.x + rightShoulder.x) / 2;
+            if (nose && Math.abs(nose.x - midShoulderX) > 0.05) {
+                feedback.push('✅ Good head movement off the centerline');
+            } else {
+                feedback.push('⚠️ Move your head off centerline when slipping');
+            }
+        } else if (skill.includes('pivot') || skill.includes('footwork')) {
+            const leftHip = landmarks[23];
+            const rightHip = landmarks[24];
+            if (leftHip && rightHip && Math.abs(leftHip.x - rightHip.x) < 0.12) {
+                feedback.push('⚠️ Rotate your hips more through the pivot');
+            } else {
+                feedback.push('✅ Good hip rotation through the pivot');
             }
         }
     }

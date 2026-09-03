@@ -270,7 +270,7 @@ async function fetchWithAuth(url, options = {}) {
     }
 
     const response = await fetch(url, { ...options, headers });
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
         if (await refreshAccessToken()) {
             const retryHeaders = new Headers(options.headers || {});
             retryHeaders.set('Authorization', `Bearer ${localStorage.getItem('token')}`);

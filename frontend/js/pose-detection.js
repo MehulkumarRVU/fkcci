@@ -12,6 +12,9 @@ class PoseDetector {
         this.canvasCtx = null;
         this.lastFrameTime = Date.now();
         this.fps = 0;
+        // Opt-in background segmentation ("subject isolation") - off by
+        // default since it's WASM-heavy and changes the whole visual.
+        this.isolateSubject = false;
     }
 
     async initialize(videoElement, canvasElement) {
@@ -27,10 +30,14 @@ class PoseDetector {
         });
 
         this.pose.setOptions({
-            modelComplexity: 1,
+            // 2 = MediaPipe's most accurate (heaviest) landmark model - was
+            // 1 (the mid-tier model), traded for a real accuracy gain since
+            // this runs on the browser's GPU/WASM path, not a constrained
+            // mobile CPU.
+            modelComplexity: 2,
             smoothLandmarks: true,
-            enableSegmentation: false,
-            smoothSegmentation: false,
+            enableSegmentation: true,
+            smoothSegmentation: true,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
@@ -119,6 +126,13 @@ class PoseDetector {
         this.canvasCtx.save();
         this.canvasCtx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
 
+        // Subject isolation: paint an opaque composite (person over a
+        // solid backdrop) that covers the raw <video> element sitting
+        // beneath this canvas - off by default, toggled via setIsolateSubject.
+        if (this.isolateSubject && results.segmentationMask) {
+            this.drawSubjectIsolation(results);
+        }
+
         // Draw pose landmarks if detected
         if (results.poseLandmarks) {
             this.drawLandmarks(results.poseLandmarks);
@@ -131,6 +145,30 @@ class PoseDetector {
         if (this.onResultsCallback && results.poseLandmarks) {
             this.onResultsCallback(results.poseLandmarks);
         }
+    }
+
+    drawSubjectIsolation(results) {
+        const ctx = this.canvasCtx;
+        const w = this.canvasElement.width;
+        const h = this.canvasElement.height;
+
+        // Keep only the person: draw the segmentation mask, then use it
+        // as an alpha mask to composite in the matching video frame.
+        ctx.drawImage(results.segmentationMask, 0, 0, w, h);
+        ctx.globalCompositeOperation = 'source-in';
+        ctx.drawImage(results.image, 0, 0, w, h);
+
+        // Solid backdrop behind the isolated person, replacing the
+        // original background.
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    setIsolateSubject(enabled) {
+        this.isolateSubject = enabled;
     }
 
     drawLandmarks(landmarks) {

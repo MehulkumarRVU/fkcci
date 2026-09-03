@@ -61,7 +61,8 @@ async function loadDashboard() {
         // Update progress bars
         const reactionPct = stats.average_reaction === null || stats.average_reaction === undefined ? 0 : stats.average_reaction;
         document.getElementById('reactionProgress').style.width = `${reactionPct}%`;
-        document.getElementById('reactionProgress').textContent = stats.average_reaction === null ? 'N/A' : `${reactionPct}%`;
+        document.getElementById('reactionProgress').textContent =
+            stats.average_reaction === null || stats.average_reaction === undefined ? 'N/A' : `${reactionPct}%`;
         document.getElementById('balanceProgress').style.width = `${stats.average_balance}%`;
         document.getElementById('balanceProgress').textContent = `${stats.average_balance}%`;
 

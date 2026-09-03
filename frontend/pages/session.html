@@ -19,34 +19,37 @@
                 <li><a href="session.html">Start Session</a></li>
                 <li id="adminLink" style="display: none;"><a href="admin.html">Admin</a></li>
                 <li><a href="profile.html">Profile</a></li>
+                <li><a href="pricing.html">Pricing</a></li>
                 <li><a href="#" id="logoutBtn" class="btn btn-danger">Logout</a></li>
             </ul>
         </div>
     </nav>
 
-    <div class="container" style="padding: 2rem;">
-        <!-- Session Setup -->
-        <div id="sessionSetup" class="card" style="max-width: 600px; margin: 0 auto;">
-            <h2 class="card-header">Setup Your Training Session</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-                After you press Start Training Session, you will be redirected to the live camera page.
-            </p>
-            <form id="sessionSetupForm">
-                <div class="form-group">
-                    <label class="form-label" for="sessionType">Session Type</label>
-                    <select id="sessionType" class="form-select" required>
-                        <option value="">Select your sport first...</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="skillSelect">Skill to Practice</label>
-                    <select id="skillSelect" class="form-select" required>
-                        <option value="">Loading skills...</option>
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-primary btn-large" style="width: 100%;">Start Training Session</button>
-            </form>
-        </div>
+    <div id="sessionSetup" style="padding: 3rem 4vw;">
+        <h2 style="border-bottom: 2px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1rem;">Setup Your Training Session</h2>
+        <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 1.1rem;">
+            After you press Start Training Session, you will be redirected to the live camera page.
+        </p>
+        <form id="sessionSetupForm" style="max-width: 100%;">
+            <div class="form-group">
+                <label class="form-label" for="sessionType">Session Type</label>
+                <select id="sessionType" class="form-select" required>
+                    <option value="">Select your sport first...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="skillSelect">Skill to Practice</label>
+                <select id="skillSelect" class="form-select" required>
+                    <option value="">Loading skills...</option>
+                </select>
+            </div>
+            <div class="form-group hidden" id="targetRepsGroup">
+                <label class="form-label" for="targetReps">Target Reps (optional)</label>
+                <input type="number" id="targetReps" class="form-input" min="1" max="999" placeholder="e.g. 10">
+            </div>
+            <button type="submit" class="btn btn-primary btn-large" style="width: 100%;">Start Training Session</button>
+        </form>
+    </div>
     </div>
 
     <script src="../js/auth-utils.js"></script>

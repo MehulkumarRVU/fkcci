@@ -1,5 +1,6 @@
 from typing import Any, Dict, List
 from ..base_analyzer import BaseAnalyzer
+from ..shared.mirroring import get_dominant_and_off_side
 from ..shared.thresholds import scale_penalty
 from ..shared.utils import PoseUtils
 
@@ -16,10 +17,13 @@ class FencingAnalyzer(BaseAnalyzer):
         left_knee = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["LEFT_KNEE"])
         right_knee = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_KNEE"])
         nose = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["NOSE"])
-        left_shoulder = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["LEFT_SHOULDER"])
-        right_shoulder = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_SHOULDER"])
-        right_wrist = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["RIGHT_WRIST"])
-        left_wrist = PoseUtils.get_landmark(landmarks, PoseUtils.LANDMARKS["LEFT_WRIST"])
+        # Weapon (pointing) arm resolved from the athlete's dominant_hand -
+        # previously picked per-frame by comparing wrist-to-nose distance,
+        # which could flip which arm was scored frame-to-frame (e.g. during
+        # a parry recovery when the off-arm is momentarily more extended).
+        weapon_side, _off_side, _side_label = get_dominant_and_off_side(landmarks, dominant_hand)
+        wrist = weapon_side.wrist
+        shoulder = weapon_side.shoulder
 
         # Lunge depth proxy: front knee should be bent and lower than rear knee
         if PoseUtils.is_confident(left_knee) and PoseUtils.is_confident(right_knee):
@@ -31,10 +35,7 @@ class FencingAnalyzer(BaseAnalyzer):
                 technique_score -= scale_penalty(10.0, skill_level)
 
         # Pointing arm alignment: head to shoulder to wrist roughly colinear
-        if PoseUtils.is_confident(nose) and PoseUtils.is_confident(right_wrist) and PoseUtils.is_confident(left_wrist):
-            side = "right" if abs(right_wrist["x"] - nose["x"]) > abs(left_wrist["x"] - nose["x"]) else "left"
-            wrist = right_wrist if side == "right" else left_wrist
-            shoulder = right_shoulder if side == "right" else left_shoulder
+        if PoseUtils.is_confident(nose) and PoseUtils.is_confident(wrist) and PoseUtils.is_confident(shoulder):
             angle = PoseUtils.calculate_angle_safe(shoulder, nose, wrist)
             delta, msg = self.check_max(
                 angle, 20, skill_level, penalty=8,

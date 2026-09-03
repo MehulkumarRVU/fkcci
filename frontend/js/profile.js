@@ -18,7 +18,7 @@ async function loadProfile() {
         const response = await fetchWithAuth(`${API_URL}/api/auth/me`);
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
+            if (response.status === 401) {
                 return handleUnauthorized();
             }
             throw new Error('Failed to load profile');
@@ -80,6 +80,10 @@ async function loadProfile() {
         document.getElementById('profileSkillLevel').textContent = athlete.skill_level;
         document.getElementById('profileDominantHand').textContent = athlete.dominant_hand;
         document.getElementById('profileMembership').textContent = athlete.membership_tier.toUpperCase();
+        const upgradeLink = document.getElementById('upgradeLink');
+        if (upgradeLink) {
+            upgradeLink.classList.toggle('hidden', athlete.membership_tier === 'pro');
+        }
         document.getElementById('profileCreatedAt').textContent = formatDate(athlete.created_at);
         
         const perfRating = Math.round(athlete.performance_rating);
@@ -342,7 +346,7 @@ document.getElementById('updatePhysicalForm').addEventListener('submit', async (
         });
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
+            if (response.status === 401) {
                 return handleUnauthorized();
             }
             throw new Error('Failed to update physical stats');
@@ -398,7 +402,7 @@ document.getElementById('updatePreferencesForm').addEventListener('submit', asyn
         });
 
         if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
+            if (response.status === 401) {
                 return handleUnauthorized();
             }
             const errorData = await response.json();

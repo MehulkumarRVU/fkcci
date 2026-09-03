@@ -117,8 +117,18 @@ class BoxingAnalyzer(BaseAnalyzer):
             left_elbow_angle = PoseUtils.calculate_angle_safe(left_shoulder, left_elbow, left_wrist)
             right_elbow_angle = PoseUtils.calculate_angle_safe(right_shoulder, right_elbow, right_wrist)
             hook_angle = None
+            hook_side = None
             if left_elbow_angle is not None and right_elbow_angle is not None and PoseUtils.is_confident(left_wrist) and PoseUtils.is_confident(right_wrist):
-                hook_angle = left_elbow_angle if left_wrist["x"] < right_wrist["x"] else right_elbow_angle
+                # A hook can be thrown lead or rear hand, so unlike Jab/Cross
+                # this can't be resolved from stance alone - instead pick
+                # whichever arm is actually bent near the ~90 degree hook
+                # angle. Previously this compared wrist x-position, which
+                # depends on instantaneous camera framing and could flip
+                # which arm was graded frame-to-frame within one session.
+                if abs(left_elbow_angle - 90) <= abs(right_elbow_angle - 90):
+                    hook_angle, hook_side = left_elbow_angle, "left"
+                else:
+                    hook_angle, hook_side = right_elbow_angle, "right"
             if hook_angle is not None:
                 joint_angles["hook_elbow"] = hook_angle
             delta, msg = self.check_range(
@@ -131,8 +141,7 @@ class BoxingAnalyzer(BaseAnalyzer):
             if msg:
                 feedback.append(msg)
             severity = classify_deviation(hook_angle, 80, 100)
-            if severity and hook_angle is not None:
-                hook_side = "left" if (PoseUtils.is_confident(left_wrist) and PoseUtils.is_confident(right_wrist) and left_wrist["x"] < right_wrist["x"]) else "right"
+            if severity and hook_side is not None:
                 deviations[PoseUtils.LANDMARKS[f"{'LEFT' if hook_side == 'left' else 'RIGHT'}_ELBOW"]] = severity
 
         if "Uppercut" in skill_name and PoseUtils.is_confident(left_wrist) and PoseUtils.is_confident(left_shoulder) \

@@ -48,6 +48,17 @@ const SPORT_FAMILY = {
     rehabilitation: 'fitness', home_workouts: 'fitness', calisthenics: 'fitness', gymnastics: 'fitness', swimming: 'fitness'
 };
 
+// Mirrors rep-counter.js's RepCounter._detectMode() sport list - only
+// these sports have a server-side count to cross-check against, so a
+// target only makes sense for them.
+const SPORTS_WITH_REP_COUNTER = ['ai_gym_coach', 'boxing', 'basketball'];
+
+function updateTargetRepsVisibility(sportType) {
+    const group = document.getElementById('targetRepsGroup');
+    if (!group) return;
+    group.classList.toggle('hidden', !SPORTS_WITH_REP_COUNTER.includes(sportType));
+}
+
 function populateSessionTypeOptions(sportType) {
     const select = document.getElementById('sessionType');
     if (!select) return;
@@ -85,6 +96,7 @@ async function init() {
     }
 
     populateSessionTypeOptions(athlete.sport_type);
+    updateTargetRepsVisibility(athlete.sport_type);
 
     // Setup logout button
     const logoutBtn = document.getElementById('logoutBtn');
@@ -125,7 +137,7 @@ async function loadSkills() {
         let skills = await response.json();
 
         if (!Array.isArray(skills) || skills.length === 0) {
-            const seedResponse = await fetch(`${API_URL}/api/skills/seed`, { method: 'POST' });
+            const seedResponse = await fetchWithAuth(`${API_URL}/api/skills/seed`, { method: 'POST' });
             if (!seedResponse.ok) {
                 console.warn('Skill seed endpoint failed:', seedResponse.status, seedResponse.statusText);
             }
@@ -189,6 +201,8 @@ async function startSession(e) {
     const sessionType = document.getElementById('sessionType').value;
     const skillSelect = document.getElementById('skillSelect');
     const selectedOption = skillSelect.options[skillSelect.selectedIndex];
+    const targetRepsInput = document.getElementById('targetReps');
+    const targetReps = targetRepsInput && targetRepsInput.value ? parseInt(targetRepsInput.value, 10) : null;
 
     if (!sessionType) {
         alert('Please select a session type');
@@ -229,7 +243,7 @@ async function startSession(e) {
                 // Ignore parse errors and keep fallback detail
             }
 
-            if (response.status === 401 || response.status === 403) {
+            if (response.status === 401) {
                 handleUnauthorized();
                 return;
             }
@@ -247,7 +261,7 @@ async function startSession(e) {
                 // Ignore parse errors and keep fallback detail
             }
 
-            if (response.status === 401 || response.status === 403) {
+            if (response.status === 401) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('athlete');
                 sessionStorage.removeItem('activeSession');
@@ -265,6 +279,7 @@ async function startSession(e) {
             session: createdSession,
             skill: selectedSkill,
             sessionType,
+            targetReps: targetReps && targetReps > 0 ? targetReps : null,
             startedAt: Date.now()
         }));
 

@@ -80,7 +80,7 @@ p {
 
 /* Container */
 .container {
-    max-width: 1200px;
+    max-width: 1440px;
     margin: 0 auto;
     padding: 0 var(--space-xl);
 }
@@ -195,8 +195,8 @@ p {
 }
 
 .btn-large {
-    padding: 1rem 2rem;
-    font-size: 1.125rem;
+    padding: 1.15rem 2rem;
+    font-size: 1.2rem;
 }
 
 .btn-small {
@@ -215,13 +215,13 @@ p {
     background-color: white;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
-    padding: var(--space-lg);
+    padding: var(--space-xl);
     margin-bottom: var(--space-lg);
     transition: box-shadow 0.2s ease;
 }
 
 .card-header {
-    font-size: 1.25rem;
+    font-size: 1.4rem;
     font-weight: 600;
     margin-bottom: var(--space-md);
     padding-bottom: 0.75rem;
@@ -241,6 +241,7 @@ p {
     display: block;
     margin-bottom: var(--space-sm);
     font-weight: 500;
+    font-size: 1.05rem;
     color: var(--text-primary);
 }
 
@@ -248,10 +249,10 @@ p {
 .form-select,
 .form-textarea {
     width: 100%;
-    padding: 0.75rem;
+    padding: 0.9rem 1rem;
     border: 2px solid var(--border-color);
     border-radius: var(--radius-md);
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-family: inherit;
     transition: border-color 0.2s;
 }
@@ -261,6 +262,28 @@ p {
 .form-textarea:focus {
     outline: none;
     border-color: var(--primary-color);
+}
+
+.password-field {
+    position: relative;
+}
+
+.password-field input {
+    padding-right: 2.75rem;
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0.25rem;
+    color: var(--text-secondary);
 }
 
 .checkbox-dropdown {
@@ -339,6 +362,13 @@ p {
     grid-template-columns: repeat(3, 1fr);
 }
 
+/* Wide main content + narrower sidebar, YouTube-watch-page style - used
+   on the camera/training pages so the video dominates instead of sharing
+   an even split with the tips/feedback panel. */
+.grid-video {
+    grid-template-columns: 2.2fr 1fr;
+}
+
 .grid-4 {
     grid-template-columns: repeat(4, 1fr);
 }
@@ -409,7 +439,7 @@ p {
 .stat-card {
     background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
     color: white;
-    padding: var(--space-lg);
+    padding: var(--space-xl);
     border-radius: var(--radius-lg);
     text-align: center;
     box-shadow: var(--shadow-md);
@@ -430,7 +460,7 @@ p {
 .stat-card-accent { background: linear-gradient(135deg, var(--accent-color), var(--accent-dark)); }
 
 .stat-value {
-    font-size: 2.5rem;
+    font-size: 2.75rem;
     font-weight: bold;
     display: block;
 }
@@ -445,7 +475,7 @@ p {
 .video-container {
     position: relative;
     width: 100%;
-    max-width: 800px;
+    max-width: 1100px;
     margin: 0 auto;
     background-color: black;
     border-radius: var(--radius-xl);
@@ -1050,7 +1080,8 @@ p {
 
     .grid-2,
     .grid-3,
-    .grid-4 {
+    .grid-4,
+    .grid-video {
         grid-template-columns: 1fr;
     }
 

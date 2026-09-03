@@ -39,6 +39,18 @@ class RepCounter {
         // Jump state - needs a 3-frame window to detect a local minimum
         this.kneeHeightBuffer = [];
         this.jumps = 0;
+
+        // Optional athlete-declared goal, set via setTargetReps() - purely
+        // a UI target, doesn't change the counting algorithms above.
+        this.targetReps = null;
+    }
+
+    setTargetReps(target) {
+        this.targetReps = target && target > 0 ? target : null;
+    }
+
+    goalReached() {
+        return this.targetReps !== null && this.getCount() >= this.targetReps;
     }
 
     _detectMode() {

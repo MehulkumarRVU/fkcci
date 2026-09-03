@@ -135,4 +135,84 @@ function getSportIcon(sportType) {
     return map[sportType] || '🏅';
 }
 
+// Full sport catalog for the landing page's "more sports" grid, grouped
+// the same way as the backend's registry (backend/app/sports_registry.py)
+// - table_tennis/boxing/badminton get their own detailed cards above and
+// are excluded here.
+const MORE_SPORT_CATEGORIES = [
+    {
+        category: 'Racket Sports',
+        sports: [
+            { key: 'tennis', name: 'Tennis', icon: '🎾' },
+            { key: 'pickleball', name: 'Pickleball', icon: '🥎' },
+            { key: 'squash', name: 'Squash', icon: '🏓' },
+        ],
+    },
+    {
+        category: 'Combat & Martial Arts',
+        sports: [
+            { key: 'kickboxing', name: 'Kickboxing', icon: '🥊' },
+            { key: 'muay_thai', name: 'Muay Thai', icon: '🦵' },
+            { key: 'karate', name: 'Karate', icon: '🥋' },
+            { key: 'taekwondo', name: 'Taekwondo', icon: '🥋' },
+            { key: 'judo', name: 'Judo', icon: '🥋' },
+            { key: 'bjj', name: 'Brazilian Jiu-Jitsu', icon: '🥋' },
+            { key: 'wrestling', name: 'Wrestling', icon: '🤼' },
+            { key: 'fencing', name: 'Fencing', icon: '🤺' },
+            { key: 'wwe', name: 'WWE', icon: '🤼' },
+        ],
+    },
+    {
+        category: 'Court & Team Sports',
+        sports: [
+            { key: 'basketball', name: 'Basketball', icon: '🏀' },
+            { key: 'volleyball', name: 'Volleyball', icon: '🏐' },
+            { key: 'handball', name: 'Handball', icon: '🤾' },
+            { key: 'football', name: 'Football', icon: '⚽' },
+            { key: 'baseball', name: 'Baseball', icon: '⚾' },
+            { key: 'cricket', name: 'Cricket', icon: '🏏' },
+            { key: 'hockey', name: 'Hockey', icon: '🏒' },
+            { key: 'ice_hockey', name: 'Ice Hockey', icon: '🏒' },
+            { key: 'kabaddi', name: 'Kabaddi', icon: '🏅' },
+        ],
+    },
+    {
+        category: 'Precision & Fitness',
+        sports: [
+            { key: 'indoor_archery', name: 'Indoor Archery', icon: '🏹' },
+            { key: 'ai_gym_coach', name: 'AI Gym Coach', icon: '🏋️' },
+            { key: 'stretching', name: 'Stretching', icon: '🤸' },
+            { key: 'mobility_training', name: 'Mobility Training', icon: '🦴' },
+            { key: 'rehabilitation', name: 'Rehabilitation', icon: '🩺' },
+            { key: 'home_workouts', name: 'Home Workouts', icon: '🏠' },
+            { key: 'calisthenics', name: 'Calisthenics', icon: '💪' },
+            { key: 'weight_lifting', name: 'Weight Lifting', icon: '🏋️' },
+            { key: 'gymnastics', name: 'Gymnastics', icon: '🤸' },
+            { key: 'shooting', name: 'Shooting', icon: '🎯' },
+            { key: 'swimming', name: 'Swimming', icon: '🏊' },
+            { key: 'formula1', name: 'Formula 1', icon: '🏎️' },
+            { key: 'motogp', name: 'MotoGP', icon: '🏍️' },
+        ],
+    },
+];
+
+function renderMoreSportsGrid() {
+    const container = document.getElementById('moreSportsContainer');
+    if (!container) return;
+
+    container.innerHTML = MORE_SPORT_CATEGORIES.map(({ category, sports }) => `
+        <h3 class="mb-2 mt-4">${category}</h3>
+        <div class="grid grid-3 gap-2">
+            ${sports.map(({ name, icon }) => `
+                <a href="pages/login.html" class="card" style="text-align: center; text-decoration: none; color: inherit; display: block;">
+                    <div style="font-size: 1.75rem;">${icon}</div>
+                    <div style="font-weight: 500; margin-top: 0.25rem;">${name}</div>
+                </a>
+            `).join('')}
+        </div>
+    `).join('');
+}
+
+document.addEventListener('DOMContentLoaded', renderMoreSportsGrid);
+
 console.log('PocketCoach AI - App initialized');

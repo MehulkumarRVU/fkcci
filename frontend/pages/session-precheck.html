@@ -17,6 +17,7 @@
                 <li><a href="dashboard.html">Dashboard</a></li>
                 <li><a href="session.html">Start Session</a></li>
                 <li><a href="profile.html">Profile</a></li>
+                <li><a href="pricing.html">Pricing</a></li>
                 <li><a href="#" id="logoutBtn" class="btn btn-danger">Logout</a></li>
             </ul>
         </div>
@@ -29,7 +30,7 @@
                 Before your session starts, let's make sure your camera can see your full body clearly.
             </p>
 
-            <div class="grid grid-2 gap-3 mt-3">
+            <div class="grid grid-video gap-3 mt-3">
                 <div>
                     <div class="video-container">
                         <video id="webcam" autoplay playsinline muted></video>
@@ -46,6 +47,11 @@
                                 <span style="font-weight: 500;">Resolution: </span>
                                 <span id="resolutionDisplay">-</span>
                             </div>
+                        </div>
+                        <div class="flex justify-center align-center mt-2">
+                            <button id="toggleIsolateBtn" class="btn btn-secondary" style="width: 100%;">
+                                🫥 Isolate Subject (Hide Background)
+                            </button>
                         </div>
                     </div>
                 </div>

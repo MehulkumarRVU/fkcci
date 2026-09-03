@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -11,6 +11,8 @@ from ..services.gamification_service import update_streak, check_and_award_achie
 from .auth import get_current_athlete
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
+
+FREE_TIER_SESSIONS_PER_30_DAYS = 5
 
 
 # Pydantic Models
@@ -80,7 +82,29 @@ async def create_session(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"session_type must be one of: {', '.join(valid_session_types)}"
         )
-    
+
+    # Free tier: capped at FREE_TIER_SESSIONS_PER_30_DAYS sessions in a
+    # rolling 30-day window. Pro tier is unlimited.
+    if current_athlete.membership_tier != "pro":
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        recent_session_count = (
+            db.query(SessionModel)
+            .filter(SessionModel.athlete_id == current_athlete.id, SessionModel.start_time >= thirty_days_ago)
+            .count()
+        )
+        if recent_session_count >= FREE_TIER_SESSIONS_PER_30_DAYS:
+            # 402 Payment Required, not 403 - the frontend's fetchWithAuth
+            # treats any 403 as an expired/invalid session and force-logs
+            # the athlete out, which is wrong for a plan-limit rejection
+            # (the athlete's login is completely fine).
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=(
+                    f"Free tier is limited to {FREE_TIER_SESSIONS_PER_30_DAYS} sessions per 30 days — "
+                    "upgrade to Pro for unlimited sessions."
+                ),
+            )
+
     new_session = SessionModel(
         athlete_id=current_athlete.id,
         sport_type=session_data.sport_type,

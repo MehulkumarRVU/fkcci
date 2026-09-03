@@ -11,9 +11,13 @@ const VISIBILITY_THRESHOLD = 0.5;
 const READY_RATIO_THRESHOLD = 0.8;
 const CONSECUTIVE_GOOD_FRAMES_REQUIRED = 15;
 
+const AUTO_START_GRACE_MS = 1500;
+
 let poseDetector = null;
 let consecutiveGoodFrames = 0;
+let consecutivePerfectFrames = 0;
 let cameraReady = false;
+let autoStartTriggered = false;
 
 async function initPrecheck() {
     const activeSessionRaw = sessionStorage.getItem('activeSession');
@@ -34,6 +38,17 @@ async function initPrecheck() {
     document.getElementById('readyBtn').addEventListener('click', () => {
         window.location.href = 'session-live.html';
     });
+
+    const toggleIsolateBtn = document.getElementById('toggleIsolateBtn');
+    if (toggleIsolateBtn) {
+        toggleIsolateBtn.addEventListener('click', () => {
+            const enabled = !poseDetector.isolateSubject;
+            poseDetector.setIsolateSubject(enabled);
+            toggleIsolateBtn.textContent = enabled
+                ? '🫥 Isolate Subject: On'
+                : '🫥 Isolate Subject (Hide Background)';
+        });
+    }
 
     poseDetector = new PoseDetector();
     await poseDetector.initialize(
@@ -88,24 +103,60 @@ function onPoseResults(landmarks) {
     progressEl.textContent = `${percent}%`;
     progressEl.style.backgroundColor = ratio >= READY_RATIO_THRESHOLD ? 'var(--success-color, #22c55e)' : '';
 
-    const statusEl = document.getElementById('visibilityStatus');
-
     if (ratio >= READY_RATIO_THRESHOLD) {
         consecutiveGoodFrames++;
+    } else {
+        consecutiveGoodFrames = 0;
+    }
+
+    if (ratio === 1) {
+        consecutivePerfectFrames++;
+    } else {
+        consecutivePerfectFrames = 0;
+    }
+
+    // Once auto-start has fired, leave its message and the disabled
+    // button alone - later frames (which keep arriving during the grace
+    // period) would otherwise overwrite the "starting automatically"
+    // message back to the regular ready/hold-position text.
+    if (autoStartTriggered) return;
+
+    const statusEl = document.getElementById('visibilityStatus');
+    if (ratio >= READY_RATIO_THRESHOLD) {
         statusEl.textContent = consecutiveGoodFrames >= CONSECUTIVE_GOOD_FRAMES_REQUIRED
             ? "Looking good! You're ready to start."
             : 'Hold that position...';
     } else {
-        consecutiveGoodFrames = 0;
         statusEl.textContent = visibleCount < 4
             ? 'Body not detected. Step back so the camera can see you fully.'
             : 'Move so your shoulders, hips, and knees are all visible.';
     }
 
+    if (consecutivePerfectFrames >= CONSECUTIVE_GOOD_FRAMES_REQUIRED) {
+        triggerAutoStart();
+        return;
+    }
+
     updateReadyButton();
 }
 
+function triggerAutoStart() {
+    autoStartTriggered = true;
+    const statusEl = document.getElementById('visibilityStatus');
+    statusEl.textContent = 'Perfect visibility — starting automatically…';
+
+    const readyBtn = document.getElementById('readyBtn');
+    readyBtn.textContent = 'Starting automatically…';
+    readyBtn.disabled = true;
+
+    setTimeout(() => {
+        window.location.href = 'session-live.html';
+    }, AUTO_START_GRACE_MS);
+}
+
 function updateReadyButton() {
+    if (autoStartTriggered) return;
+
     const readyBtn = document.getElementById('readyBtn');
     const isReady = cameraReady && consecutiveGoodFrames >= CONSECUTIVE_GOOD_FRAMES_REQUIRED;
 

@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import base64
 import hashlib
 import hmac
+import logging
 import secrets
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -452,7 +453,16 @@ async def request_password_reset(payload: PasswordResetRequest, db: Session = De
         auth_service = AuthService(db)
         token = auth_service.create_password_reset_token(athlete)
         reset_link = f"{settings.FRONTEND_BASE_URL}/pages/reset-password.html?token={token}"
-        send_password_reset_email(athlete.email, reset_link)
+        try:
+            send_password_reset_email(athlete.email, reset_link)
+        except Exception:
+            # A misconfigured/rejected SMTP send shouldn't surface as a
+            # 500 or reveal to the caller whether the email exists - the
+            # token still exists server-side, just log it for the admin
+            # to notice and fix the SMTP_* env vars.
+            logging.getLogger("pocketcoach.email").exception(
+                "Failed to send password reset email to %s", athlete.email
+            )
 
     return _GENERIC_RESET_RESPONSE
 
