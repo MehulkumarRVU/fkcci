@@ -1,7 +1,11 @@
 #!/usr/bin/env python
+import sys
 import requests
 import json
 from random import randint
+
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 
 BASE_URL = "http://localhost:8080/api"
 
@@ -43,7 +47,9 @@ try:
     )
     if login_response.status_code == 200:
         coach_token = login_response.json()['access_token']
+        coach_headers = {"Authorization": "Bearer " + coach_token}
         coach_headers = {"Authorization": f"Bearer {coach_token}"}
+        coach_headers = {"Authorization": "Bearer " + coach_token}
         print(f"✅ Coach Login Successful")
     else:
         print(f"❌ Failed: {login_response.text}")
@@ -69,6 +75,14 @@ try:
         athlete_data = athlete_response.json()
         print(f"✅ Athlete Created: ID={athlete_data['id']}, Username={athlete_data['username']}")
         athlete_id = athlete_data['id']
+        athlete_login = requests.post(
+            f"{BASE_URL}/auth/login",
+            data={"username": athlete_user, "password": "secret123"}
+        )
+        athlete_login.raise_for_status()
+        athlete_headers = {"Authorization": "Bearer " + athlete_login.json()["access_token"]}
+        athlete_headers = {"Authorization": f"******"}
+        athlete_headers = {"Authorization": "Bearer " + athlete_login.json()["access_token"]}
     else:
         print(f"❌ Failed: {athlete_response.text}")
         exit(1)
@@ -76,8 +90,27 @@ except Exception as e:
     print(f"❌ Error: {e}")
     exit(1)
 
-# 4. Test Coach Summary
-print("\n[4] Testing Coach Summary Endpoint...")
+# 4. Connect athlete to coach
+print("\n[4] Connecting Athlete to Coach...")
+try:
+    request_response = requests.post(
+        f"{BASE_URL}/coaches/{coach_id}/request",
+        headers=athlete_headers
+    )
+    request_response.raise_for_status()
+    request_id = request_response.json()["id"]
+    accept_response = requests.post(
+        f"{BASE_URL}/coaches/requests/{request_id}/accept",
+        headers=coach_headers
+    )
+    accept_response.raise_for_status()
+    print("✅ Athlete connected to coach")
+except Exception as e:
+    print(f"❌ Error: {e}")
+    exit(1)
+
+# 5. Test Coach Summary
+print("\n[5] Testing Coach Summary Endpoint...")
 try:
     summary_response = requests.get(
         f"{BASE_URL}/analytics/coach/summary",
@@ -91,11 +124,13 @@ try:
         print(f"   - Avg Performance: {summary['avg_performance_across_athletes']}%")
     else:
         print(f"❌ Failed: {summary_response.text}")
+        exit(1)
 except Exception as e:
     print(f"❌ Error: {e}")
+    exit(1)
 
-# 5. Test Coach Athletes List
-print("\n[5] Testing Coach Athletes Endpoint...")
+# 6. Test Coach Athletes List
+print("\n[6] Testing Coach Athletes Endpoint...")
 try:
     athletes_response = requests.get(
         f"{BASE_URL}/analytics/coach/athletes",
@@ -108,11 +143,13 @@ try:
             print(f"   - {athlete['username']} ({athlete['sport_type']}, {athlete['skill_level']})")
     else:
         print(f"❌ Failed: {athletes_response.text}")
+        exit(1)
 except Exception as e:
     print(f"❌ Error: {e}")
+    exit(1)
 
-# 6. Test Monthly Report (should show no sessions yet)
-print("\n[6] Testing Monthly Report Endpoint...")
+# 7. Test Monthly Report (should show no sessions yet)
+print("\n[7] Testing Monthly Report Endpoint...")
 try:
     report_response = requests.get(
         f"{BASE_URL}/analytics/coach/athlete/{athlete_id}/monthly-report",
@@ -127,8 +164,10 @@ try:
         print(f"   - Avg Performance Score: {report['monthly_stats']['avg_performance_score']}%")
     else:
         print(f"❌ Failed: {report_response.text}")
+        exit(1)
 except Exception as e:
     print(f"❌ Error: {e}")
+    exit(1)
 
 print("\n" + "=" * 50)
 print("✅ ALL TESTS PASSED - COACH DASHBOARD IS READY")

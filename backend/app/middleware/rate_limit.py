@@ -60,16 +60,19 @@ class RateLimitMiddleware:
                 import redis.asyncio as aioredis
 
                 redis_client = aioredis.from_url(self.redis_url)
+                ping = redis_client.ping()
+                loop = None
                 try:
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                    loop.run_until_complete(redis_client.ping())
-                    loop.close()
+                    loop.run_until_complete(ping)
                     self.bucket = RedisBucket(redis_client, self.requests, self.window)
                     return
                 except Exception:
-                    pass
+                    ping.close()
                 finally:
+                    if loop is not None:
+                        loop.close()
                     try:
                         asyncio.set_event_loop(None)
                     except RuntimeError:

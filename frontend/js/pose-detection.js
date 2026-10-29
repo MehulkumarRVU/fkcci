@@ -50,8 +50,9 @@ class PoseDetector {
     async startCamera() {
         if (this.isRunning) return;
 
+        let stream = null;
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
+            stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     width: { ideal: 1280 },
                     height: { ideal: 720 }
@@ -81,6 +82,12 @@ class PoseDetector {
             return true;
 
         } catch (error) {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            if (this.videoElement) {
+                this.videoElement.srcObject = null;
+            }
             console.error('Error starting camera:', error);
             alert('Unable to access camera. Please ensure camera permissions are granted.');
             return false;
@@ -88,8 +95,6 @@ class PoseDetector {
     }
 
     stopCamera() {
-        if (!this.isRunning) return;
-
         this.isRunning = false;
 
         if (this.videoElement && this.videoElement.srcObject) {
@@ -235,6 +240,22 @@ class PoseDetector {
             z: lm.z,
             visibility: lm.visibility
         }));
+    }
+
+    getLandmarkQuality(landmarks) {
+        const keyIndices = [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28];
+        const valid = keyIndices.filter(index => {
+            const landmark = landmarks[index];
+            return landmark
+                && Number.isFinite(landmark.x)
+                && Number.isFinite(landmark.y)
+                && Number.isFinite(landmark.z)
+                && landmark.visibility >= 0.5;
+        }).length;
+        return {
+            coverage: valid / keyIndices.length,
+            reliable: valid / keyIndices.length >= 0.5
+        };
     }
 }
 

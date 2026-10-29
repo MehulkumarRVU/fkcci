@@ -43,6 +43,27 @@
                     <option value="">Loading skills...</option>
                 </select>
             </div>
+            <fieldset class="form-group">
+                <legend class="form-label">Training mode</legend>
+                <label><input type="radio" name="trainingMode" value="standard" checked> Standard Training</label>
+                <label style="margin-left: 1rem;"><input type="radio" name="trainingMode" value="adaptive"> Adaptive Training</label>
+            </fieldset>
+            <div id="adaptiveOptions" class="form-group hidden" aria-live="polite">
+                <label class="form-label" for="adaptiveExercise">Adaptive exercise</label>
+                <select id="adaptiveExercise" class="form-select"></select>
+                <label class="form-label" for="adaptiveSetup">Training setup</label>
+                <select id="adaptiveSetup" class="form-select">
+                    <option value="standing">Standing</option>
+                    <option value="seated">Seated</option>
+                    <option value="wheelchair">Wheelchair-based</option>
+                </select>
+                <label class="form-label" for="adaptiveCamera">Camera orientation</label>
+                <select id="adaptiveCamera" class="form-select">
+                    <option value="front">Front</option>
+                    <option value="side">Side</option>
+                </select>
+                <p id="adaptiveGuidance" role="status" style="color: var(--text-secondary);"></p>
+            </div>
             <div class="form-group hidden" id="targetRepsGroup">
                 <label class="form-label" for="targetReps">Target Reps (optional)</label>
                 <input type="number" id="targetReps" class="form-input" min="1" max="999" placeholder="e.g. 10">
@@ -52,7 +73,7 @@
     </div>
     </div>
 
-    <script src="../js/auth-utils.js"></script>
+    <script src="../js/auth-utils.js?v=4"></script>
     <script>
         // Show admin link for coaches
         document.addEventListener('DOMContentLoaded', function() {
@@ -79,6 +100,6 @@
             }
         });
     </script>
-    <script src="../js/session.js"></script>
+    <script src="../js/session.js?v=4"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@ from backend.app.models.skill import Skill
 
 def test_gym_skill_seed_includes_kaggle_style_exercises():
     skills = get_default_skill_data()
-    gym_skills = [skill for skill in skills if skill["sport_type"] == "ai_gym_coach"]
+    gym_skills = [skill for skill in skills if skill["sport_type"] == "gym"]
 
     assert gym_skills, "Expected gym skills to be seeded"
     skill_names = {skill["name"] for skill in gym_skills}

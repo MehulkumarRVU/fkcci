@@ -1,5 +1,9 @@
 // PocketCoach AI - Profile Management Module
-const API_URL = 'http://localhost:8080';
+const API_URL = window.POCKETCOACH_API_URL || (
+    window.location.port === '3000' || window.location.port === '5500'
+        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        : ''
+);
 
 requireAuth();
 
@@ -30,6 +34,7 @@ async function loadProfile() {
 
         const athlete = await response.json();
         localStorage.setItem('athlete', JSON.stringify(athlete));
+        loadAdaptiveProfile(athlete);
 
         // Display profile information
         document.getElementById('profileUsername').textContent = athlete.username;
@@ -45,22 +50,7 @@ async function loadProfile() {
                 table_tennis: '🏓 Table Tennis',
                 boxing: '🥊 Boxing',
                 badminton: '🏸 Badminton',
-                tennis: '🎾 Tennis',
-                pickleball: '🥎 Pickleball',
-                squash: '🏓 Squash',
-                kickboxing: '🥊 Kickboxing',
-                muay_thai: '🦵 Muay Thai',
-                karate: '🥋 Karate',
-                taekwondo: '🥋 Taekwondo',
-                judo: '🥋 Judo',
-                bjj: '🥋 BJJ',
-                wrestling: '🤼 Wrestling',
-                fencing: '🤺 Fencing',
-                basketball: '🏀 Basketball',
-                volleyball: '🏐 Volleyball',
-                handball: '🤾 Handball',
-                indoor_archery: '🏹 Indoor Archery',
-                ai_gym_coach: '🏋️ AI Gym Coach',
+                gym: '🏋️ Gym',
                 stretching: '🤸 Stretching',
                 mobility_training: '🦴 Mobility Training',
                 rehabilitation: '🩺 Rehabilitation',
@@ -77,6 +67,7 @@ async function loadProfile() {
                 .map(sport => `<option value="${sport}">${sportDisplay(sport)}</option>`)
                 .join('');
         }
+
         document.getElementById('profileSkillLevel').textContent = athlete.skill_level;
         document.getElementById('profileDominantHand').textContent = athlete.dominant_hand;
         document.getElementById('profileMembership').textContent = athlete.membership_tier.toUpperCase();
@@ -106,11 +97,8 @@ async function loadProfile() {
         }
 
         const allSports = [
-            'table_tennis', 'boxing', 'badminton', 'tennis', 'pickleball', 'squash',
-            'kickboxing', 'muay_thai', 'karate', 'taekwondo', 'judo', 'bjj', 'wrestling',
-            'fencing', 'basketball', 'volleyball', 'handball', 'indoor_archery',
-            'ai_gym_coach', 'stretching', 'mobility_training', 'rehabilitation',
-            'home_workouts', 'calisthenics'
+            'boxing', 'table_tennis', 'gym', 'badminton', 'stretching',
+            'mobility_training', 'rehabilitation', 'home_workouts', 'calisthenics'
         ];
 
         const connectedSportsMenu = document.getElementById('linkedSportsMenu');
@@ -169,6 +157,72 @@ async function loadProfile() {
         showAlert('Failed to load profile data', 'error');
     }
 }
+
+async function loadAdaptiveProfile() {
+    const enabled = document.getElementById('adaptiveEnabled');
+    const options = document.getElementById('profileAdaptiveOptions');
+    if (!enabled || !options) return;
+    try {
+        const response = await fetchWithAuth(`${API_URL}/api/adaptive/profile`);
+        if (!response.ok) throw new Error('Failed to load adaptive profile');
+        const data = await response.json();
+        enabled.checked = Boolean(data.enabled);
+        options.classList.toggle('hidden', !enabled.checked);
+        const profile = data.profile || {};
+        if (profile.preferred_setup) document.getElementById('adaptiveSetup').value = profile.preferred_setup;
+        document.getElementById('adaptivePreferences').value =
+            (profile.accessibility_preferences || []).join(', ');
+        const capabilities = await fetchWithAuth(`${API_URL}/api/adaptive/capabilities`);
+        if (capabilities.ok) {
+            const values = await capabilities.json();
+            document.getElementById('adaptiveCapabilities').textContent =
+                `${values.filter(item => item.adaptive_supported).length} categories support the current adaptive foundation.`;
+        }
+    } catch (error) {
+        console.error('Error loading adaptive profile:', error);
+        showAlert('Adaptive settings could not be loaded. Standard training remains available.', 'error');
+    }
+}
+
+const adaptiveEnabled = document.getElementById('adaptiveEnabled');
+if (adaptiveEnabled) {
+    adaptiveEnabled.addEventListener('change', () => {
+        document.getElementById('profileAdaptiveOptions').classList.toggle('hidden', !adaptiveEnabled.checked);
+    });
+}
+
+const adaptiveProfileForm = document.getElementById('adaptiveProfileForm');
+if (adaptiveProfileForm) {
+    adaptiveProfileForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const response = await fetchWithAuth(`${API_URL}/api/adaptive/profile`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                enabled: document.getElementById('adaptiveEnabled').checked,
+                preferred_setup: document.getElementById('adaptiveSetup').value,
+                accessibility_preferences: document.getElementById('adaptivePreferences').value
+                    .split(',').map(value => value.trim()).filter(Boolean)
+            })
+        });
+        if (!response.ok) {
+            showAlert('Adaptive settings were not saved. Your account and standard training are unchanged.', 'error');
+            return;
+        }
+        showAlert('Adaptive settings saved.', 'success');
+        await loadProfile();
+    });
+}
+
+document.getElementById('cancelAdaptiveProfile')?.addEventListener('click', () => loadProfile());
+document.getElementById('removeAdaptiveProfile')?.addEventListener('click', async () => {
+    const response = await fetchWithAuth(`${API_URL}/api/adaptive/profile`, { method: 'DELETE' });
+    if (!response.ok) {
+        showAlert('Adaptive settings could not be removed.', 'error');
+        return;
+    }
+    showAlert('Adaptive settings removed.', 'success');
+    await loadProfile();
+});
 
 // Coach connection: search+request or invite-code join, plus pending/connected state.
 async function loadCoachConnection() {

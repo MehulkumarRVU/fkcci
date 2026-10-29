@@ -54,7 +54,7 @@ class RepCounter {
     }
 
     _detectMode() {
-        if (this.sportType === 'ai_gym_coach') {
+        if (this.sportType === 'gym') {
             const isPushUp = this.skillNameLower.includes('push');
             return isPushUp ? 'pushup' : 'squat';
         }

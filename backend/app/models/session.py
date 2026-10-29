@@ -20,7 +20,8 @@ class Session(Base):
     duration_minutes = Column(Integer, default=0)
     is_completed = Column(Boolean, default=False)
     
-    # Performance Scores (0-100)
+    # Performance Scores (0-100). Null means the movement was not reliably
+    # evaluable; zero is reserved for a measured score at the lower bound.
     performance_score = Column(Float, default=0.0)
     technique_accuracy = Column(Float, default=0.0)
     reaction_score = Column(Float, default=0.0)
@@ -42,6 +43,10 @@ class Session(Base):
     # data a persistent athlete "digital twin" profile aggregates over time.
     skill_name = Column(String, nullable=True)
     joint_summary = Column(JSON, nullable=True)
+    adaptive_mode = Column(Boolean, default=False, nullable=False)
+    adaptive_setup = Column(String, nullable=True)
+    adaptive_exercise = Column(String, nullable=True)
+    adaptive_reference = Column(JSON, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     

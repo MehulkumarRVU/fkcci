@@ -40,6 +40,7 @@ class AnalyzerFactory:
         "table_tennis": TableTennisAnalyzer,
         "boxing": BoxingAnalyzer,
         "badminton": BadmintonAnalyzer,
+        "gym": lambda: AIGymCoachAnalyzer(sport_type="gym"),
         # Racket sports
         "tennis": TennisAnalyzer,
         "pickleball": lambda: RacketAnalyzer(sport_type="pickleball"),

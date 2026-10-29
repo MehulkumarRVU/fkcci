@@ -23,7 +23,7 @@ Phase 1 UI now includes indoor sports integration with enhanced dashboard, sessi
 - Overall Performance Rating
 
 ### � Supported Sports & Drills
-PocketCoach AI supports a broad set of indoor sports and training categories. Detailed skill drills are currently seeded for Table Tennis, Boxing, and Badminton, while additional supported sports are available with baseline technique drills.
+PocketCoach AI currently exposes exactly nine active training categories. Historical records from retired categories remain readable, but retired categories cannot be selected for new accounts, sessions, skills, or analysis requests.
 
 #### Sports with detailed drills
 - **Table Tennis 🏓**
@@ -50,28 +50,86 @@ PocketCoach AI supports a broad set of indoor sports and training categories. De
   - Net Play
   - Split Step Footwork
 
-#### Additional supported sports
-- Tennis 🎾
-- Pickleball 🥎
-- Squash 🏓
-- Kickboxing 🥊
-- Muay Thai 🦵
-- Karate 🥋
-- Taekwondo 🥋
-- Judo 🥋
-- Brazilian Jiu-Jitsu 🥋
-- Wrestling 🤼
-- Fencing 🤺
-- Basketball 🏀
-- Volleyball 🏐
-- Handball 🤾
-- Indoor Archery 🏹
-- AI Gym Coach 🏋️
+#### Additional active categories
+- **Gym 🏋️**
 - Stretching 🤸
 - Mobility Training 🦴
 - Rehabilitation 🩺
 - Home Workouts 🏠
 - Calisthenics 💪
+
+## Adaptive Training and ParaSports Support
+
+Adaptive Training is an optional mode inside the existing nine categories; it
+does not add a tenth category. Athletes can save a non-medical profile with a
+preferred standing, seated, or wheelchair-based setup, camera orientation,
+equipment notes, accessibility preferences, and an approved movement reference.
+Profiles can be edited or removed through the authenticated adaptive profile
+API.
+
+The current implemented foundation provides:
+
+- Exercise-specific required-landmark gating for seated and standing
+  upper-body movements.
+- Configurable references and angle-based personalized scoring for adaptive
+  reach, punch, and racket-arm exercises.
+- Front/side camera guidance, explicit insufficient-evidence and ambiguous
+  observation statuses, and session persistence of adaptive setup metadata.
+- Keyboard-label-compatible setup controls and text status guidance in the
+  training workflow.
+
+Adaptive catalog routes:
+
+- `GET /api/adaptive/catalog?category=table_tennis`
+- `GET`, `PUT`, and `DELETE /api/adaptive/profile`
+- `GET /api/adaptive/capabilities`
+
+Signup and profile integration:
+
+- Signup offers Standard Training or Adaptive Training and stores only the
+  selected setup/preferences; no diagnosis or disability disclosure is
+  required.
+- Profile settings can be enabled, disabled without deleting them, cancelled,
+  reloaded after login, or explicitly removed.
+- If a later profile save fails, the account remains usable and standard
+  training is unaffected; the profile page reports that the save can be
+  retried.
+
+Verification:
+
+```powershell
+& 'C:\Users\isha1\AppData\Local\Programs\Python\Python312\python.exe' -m pytest backend/tests
+& 'C:\Users\isha1\AppData\Local\Programs\Python\Python312\python.exe' -m compileall -q backend
+& 'C:\Users\isha1\AppData\Local\Programs\Python\Python312\python.exe' -m pip check
+```
+
+Frontend JavaScript syntax was verified with Node.js 26.13.0:
+
+```powershell
+Get-ChildItem frontend -Recurse -Filter *.js |
+  ForEach-Object { & 'C:\Program Files\nodejs\node.exe' --check $_.FullName }
+```
+
+The repository has no `package.json` or configured frontend build/lint runner,
+so no npm build or lint command is available. Browser smoke testing covered
+signup category selection, adaptive signup preferences, authenticated profile
+persistence, and adaptive session exercise/camera guidance. A full WCAG audit
+was not performed. The premium responsive layout was checked in a browser at
+320, 375, 390, 430, 768, 820, 1024, 1280, 1440, and 1920 CSS-pixel widths;
+the tested pages had no horizontal overflow. Physical iPhone, iPad, Android
+phone, and Android tablet validation was not performed because no reachable
+physical device was available.
+
+This foundation is implemented and covered by automated tests, but it is not
+clinical validation and does not infer a disability, diagnosis, impairment, or
+Paralympic eligibility. Para Table Tennis and Para-Badminton stroke/contact
+recognition, wheelchair-specific movement validation, expert agreement,
+validated athlete baselines, and depth-dependent analysis remain planned until
+consented athlete/coach data and suitable camera validation are available.
+Rehabilitation restrictions and targets should be supplied or approved by a
+qualified healthcare professional where clinically necessary. The system does
+not diagnose, prescribe treatment, assess injury severity, or determine return
+to sport.
 
 > For each additional supported sport, PocketCoach seeds a baseline drill named **Basic &lt;sport&gt; Technique** to provide a starting point for technique analysis and future drill expansion.
 
@@ -92,12 +150,36 @@ PocketCoach AI supports a broad set of indoor sports and training categories. De
    docker compose up --build
    ```
 3. Backend API is available at `http://localhost:8080`.
-4. Nginx reverse proxy is available at `http://localhost`.
+4. Nginx serves the frontend and reverse-proxies `/api` at `http://localhost`.
 
 ### Environment variables
 - `DATABASE_URL` can point to PostgreSQL using `postgresql+psycopg2://user:password@host:port/dbname`
 - `REDIS_URL` enables Redis-backed rate limiting
 - `CORS_ALLOWED_ORIGINS` controls allowed origins for the API
+- `ENV=production` requires an explicit 32-character `SECRET_KEY` and explicit
+  non-wildcard CORS origins.
+- `FRONTEND_BASE_URL` must be the public HTTPS frontend URL for password-reset
+  links.
+
+The frontend uses the local API on ports 3000/5500 during development and
+automatically uses same-origin `/api` requests behind nginx. Set
+`window.POCKETCOACH_API_URL` before the frontend scripts load only when the API
+is hosted at a separate public origin.
+
+### Controlled deployment requirements
+
+- Serve camera pages from HTTPS (or localhost during development); browsers
+  block camera access from insecure origins.
+- Use a managed PostgreSQL and Redis service in production rather than the
+  development SQLite/default container credentials.
+- Replace all example credentials in `.env`, restrict `CORS_ALLOWED_ORIGINS`
+  to the real frontend origin, and terminate TLS at the reverse proxy.
+- Run database initialization/migrations before accepting traffic. The
+  application initializes compatibility columns at startup, while the SQL
+  migration files remain the source of truth for existing deployments.
+- The repository does not include a production CI/CD deployment or a physical
+  device test harness. Android Chrome, iPhone/iPad Safari, and camera behavior
+  on real hardware remain manual release-gate checks.
 
 ---
 

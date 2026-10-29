@@ -74,6 +74,7 @@ def test_completing_already_completed_session_does_not_double_count():
         json={"sport_type": "boxing", "session_type": "drill", "skill_name": "Jab"},
         headers=headers,
     )
+    assert create_resp.status_code == 201, create_resp.text
     session_id = create_resp.json()["id"]
 
     body = {
@@ -120,3 +121,68 @@ def test_completing_session_awards_gamification():
     codes = {a["code"] for a in gam["achievements"]}
     assert "first_session" in codes
     assert "high_score" in codes
+
+
+def test_unevaluable_session_persists_null_scores_and_reason():
+    token = _signup_and_login("unevaluable_session_test_user")
+    headers = {"Authorization": f"Bearer {token}"}
+    create_resp = client.post(
+        "/api/sessions/",
+        json={"sport_type": "boxing", "session_type": "drill", "skill_name": "Jab"},
+        headers=headers,
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    session_id = create_resp.json()["id"]
+
+    put_resp = client.put(
+        f"/api/sessions/{session_id}",
+        json={
+            "is_completed": True,
+            "performance_score": None,
+            "technique_accuracy": None,
+            "balance_score": None,
+            "session_data": {
+                "evaluation_status": "insufficient_evidence",
+                "reason": "No reliable full-session analysis was completed.",
+            },
+        },
+        headers=headers,
+    )
+    assert put_resp.status_code == 200, put_resp.text
+    data = put_resp.json()
+    assert data["performance_score"] is None
+    assert data["session_data"]["evaluation_status"] == "insufficient_evidence"
+
+
+def test_session_stats_ignore_null_scores():
+    token = _signup_and_login("unevaluable_stats_test_user")
+    headers = {"Authorization": f"Bearer {token}"}
+    create_resp = client.post(
+        "/api/sessions/",
+        json={"sport_type": "boxing", "session_type": "drill", "skill_name": "Jab"},
+        headers=headers,
+    )
+    assert create_resp.status_code == 201, create_resp.text
+
+    session_id = create_resp.json()["id"]
+    complete_resp = client.put(
+        f"/api/sessions/{session_id}",
+        json={
+            "is_completed": True,
+            "performance_score": None,
+            "technique_accuracy": None,
+            "reaction_score": None,
+            "balance_score": None,
+        },
+        headers=headers,
+    )
+    assert complete_resp.status_code == 200, complete_resp.text
+
+    stats_resp = client.get("/api/sessions/stats/summary", headers=headers)
+    assert stats_resp.status_code == 200, stats_resp.text
+    stats = stats_resp.json()
+    assert stats["total_sessions"] == 1
+    assert stats["average_performance"] is None
+    assert stats["average_technique"] is None
+    assert stats["average_reaction"] is None
+    assert stats["average_balance"] is None

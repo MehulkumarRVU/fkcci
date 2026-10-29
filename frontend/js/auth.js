@@ -1,5 +1,9 @@
 // PocketCoach AI - Authentication Module
-const API_URL = 'http://localhost:8080';
+const API_URL = window.POCKETCOACH_API_URL || (
+    window.location.port === '3000' || window.location.port === '5500'
+        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        : ''
+);
 
 // Toggle between login and signup forms
 const showSignupLink = document.getElementById('showSignupLink');
@@ -43,8 +47,18 @@ if (accountTypeSelect) {
             document.getElementById('skillLevel').required = true;
             document.getElementById('dominantHand').required = true;
         }
+
     });
 }
+
+document.addEventListener('change', (event) => {
+    if (!(event.target instanceof HTMLInputElement) ||
+        event.target.name !== 'signupTrainingMode') {
+        return;
+    }
+    const adaptive = event.target.value === 'adaptive';
+    document.getElementById('signupAdaptiveOptions')?.classList.toggle('hidden', !adaptive);
+});
 
 // Login Form Handler
 const loginFormElement = document.getElementById('loginFormElement');
@@ -163,6 +177,7 @@ if (signupFormElement) {
                 const dominantHand = document.getElementById('dominantHand').value;
                 const height = document.getElementById('height').value;
                 const weight = document.getElementById('weight').value;
+                const adaptiveEnabled = document.querySelector('input[name="signupTrainingMode"]:checked')?.value === 'adaptive';
 
                 response = await fetch(`${API_URL}/api/auth/signup`, {
                     method: 'POST',
@@ -177,7 +192,13 @@ if (signupFormElement) {
                         skill_level: skillLevel,
                         dominant_hand: dominantHand,
                         height: height ? parseFloat(height) : null,
-                        weight: weight ? parseFloat(weight) : null
+                        weight: weight ? parseFloat(weight) : null,
+                        adaptive_profile: adaptiveEnabled ? {
+                            enabled: true,
+                            preferred_setup: document.getElementById('signupAdaptiveSetup').value,
+                            accessibility_preferences: document.getElementById('signupAdaptivePreferences').value
+                                .split(',').map(value => value.trim()).filter(Boolean)
+                        } : null
                     })
                 });
             }
@@ -323,4 +344,3 @@ if (localStorage.getItem('token')) {
 }
 
 console.log('Auth module loaded');
-

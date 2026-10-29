@@ -15,13 +15,15 @@ from app.routes import (
     reports_router,
     notes_router,
     coaches_router,
+    adaptive_router,
 )
 from app.middleware.rate_limit import RateLimitMiddleware
-from app.config import settings
+from app.config import settings, validate_production_security
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_production_security(settings)
     init_database()
 
     if not settings.SECRET_KEY or len(settings.SECRET_KEY) < 16:
@@ -69,6 +71,7 @@ app.include_router(gamification_router)
 app.include_router(reports_router)
 app.include_router(notes_router)
 app.include_router(coaches_router)
+app.include_router(adaptive_router)
 
 # Root endpoint
 @app.get("/")

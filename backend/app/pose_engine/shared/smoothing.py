@@ -7,6 +7,7 @@ independent single-frame scores computed from raw, unsmoothed, unfiltered
 landmarks - a single noisy/misdetected frame swung the session score
 directly.
 """
+import math
 from typing import Dict, List, Optional, Tuple
 
 from .confidence import DEFAULT_GATE
@@ -43,11 +44,33 @@ def smooth_landmarks(pose_sequence: List[List[Dict[str, float]]], alpha: float =
     for frame in pose_sequence[1:]:
         new_frame = []
         for i, lm in enumerate(frame):
+            if not lm:
+                new_frame.append(lm)
+                continue
+            coordinates_valid = all(
+                isinstance(lm.get(axis), (int, float))
+                and math.isfinite(float(lm[axis]))
+                for axis in ("x", "y", "z")
+            )
+            # Never turn an occluded/malformed landmark into a fabricated
+            # previous position. Invalid points remain invalid and are
+            # excluded by the confidence gate during scoring.
+            if lm.get("visibility", 0.0) < DEFAULT_GATE.threshold or not coordinates_valid:
+                new_frame.append(dict(lm))
+                continue
             prev_lm = prev[i] if i < len(prev) else lm
+            prev_valid = all(
+                isinstance(prev_lm.get(axis), (int, float))
+                and math.isfinite(float(prev_lm[axis]))
+                for axis in ("x", "y", "z")
+            )
+            if not prev_valid:
+                new_frame.append(dict(lm))
+                continue
             new_frame.append({
-                "x": alpha * lm.get("x", 0.0) + (1 - alpha) * prev_lm.get("x", 0.0),
-                "y": alpha * lm.get("y", 0.0) + (1 - alpha) * prev_lm.get("y", 0.0),
-                "z": alpha * lm.get("z", 0.0) + (1 - alpha) * prev_lm.get("z", 0.0),
+                "x": alpha * lm["x"] + (1 - alpha) * prev_lm["x"],
+                "y": alpha * lm["y"] + (1 - alpha) * prev_lm["y"],
+                "z": alpha * lm["z"] + (1 - alpha) * prev_lm["z"],
                 # visibility is a detector confidence signal, not a position -
                 # smoothing it would mask genuine occlusion, so pass it through.
                 "visibility": lm.get("visibility", 0.0),

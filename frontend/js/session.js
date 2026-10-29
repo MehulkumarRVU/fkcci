@@ -1,5 +1,9 @@
 // PocketCoach AI - Session Management Module
-const API_URL = 'http://localhost:8080';
+const API_URL = window.POCKETCOACH_API_URL || (
+    window.location.port === '3000' || window.location.port === '5500'
+        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        : ''
+);
 
 requireAuth();
 
@@ -38,20 +42,16 @@ const SESSION_TYPE_OPTIONS = {
 };
 
 const SPORT_FAMILY = {
-    table_tennis: 'racket', badminton: 'racket', tennis: 'racket', pickleball: 'racket', squash: 'racket',
-    boxing: 'combat', kickboxing: 'combat', muay_thai: 'combat', karate: 'combat', taekwondo: 'combat',
-    judo: 'combat', bjj: 'combat', wrestling: 'combat', fencing: 'combat', kabaddi: 'combat', wwe: 'combat',
-    basketball: 'court', volleyball: 'court', handball: 'court', football: 'court', baseball: 'court',
-    cricket: 'court', hockey: 'court', ice_hockey: 'court',
-    indoor_archery: 'precision', shooting: 'precision',
-    ai_gym_coach: 'fitness', weight_lifting: 'fitness', stretching: 'fitness', mobility_training: 'fitness',
-    rehabilitation: 'fitness', home_workouts: 'fitness', calisthenics: 'fitness', gymnastics: 'fitness', swimming: 'fitness'
+    table_tennis: 'racket', badminton: 'racket',
+    boxing: 'combat',
+    gym: 'fitness', stretching: 'fitness', mobility_training: 'fitness',
+    rehabilitation: 'fitness', home_workouts: 'fitness', calisthenics: 'fitness'
 };
 
 // Mirrors rep-counter.js's RepCounter._detectMode() sport list - only
 // these sports have a server-side count to cross-check against, so a
 // target only makes sense for them.
-const SPORTS_WITH_REP_COUNTER = ['ai_gym_coach', 'boxing', 'basketball'];
+const SPORTS_WITH_REP_COUNTER = ['gym', 'boxing'];
 
 function updateTargetRepsVisibility(sportType) {
     const group = document.getElementById('targetRepsGroup');
@@ -112,11 +112,50 @@ async function init() {
 
     // Load available skills
     await loadSkills();
+    setupAdaptiveOptions();
 
     // Setup session form
     const sessionSetupForm = document.getElementById('sessionSetupForm');
     if (sessionSetupForm) {
         sessionSetupForm.addEventListener('submit', startSession);
+    }
+
+    async function setupAdaptiveOptions() {
+        const options = document.getElementById('adaptiveOptions');
+        const modeInputs = document.querySelectorAll('input[name="trainingMode"]');
+        if (!options || !modeInputs.length) return;
+        const setVisibility = () => options.classList.toggle(
+            'hidden',
+            document.querySelector('input[name="trainingMode"]:checked').value !== 'adaptive'
+        );
+        modeInputs.forEach(input => input.addEventListener('change', setVisibility));
+        try {
+            const response = await fetch(`${API_URL}/api/adaptive/catalog?category=${encodeURIComponent(athlete.sport_type)}`);
+            if (!response.ok) throw new Error('Unable to load adaptive exercises');
+            const catalog = await response.json();
+            const exerciseSelect = document.getElementById('adaptiveExercise');
+            Object.entries(catalog.exercises || {}).forEach(([key, exercise]) => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = key.replaceAll('_', ' ');
+                option.dataset.setups = JSON.stringify(exercise.setups);
+                option.dataset.views = JSON.stringify(exercise.camera_views);
+                exerciseSelect.appendChild(option);
+            });
+            const updateGuidance = () => {
+                const selected = exerciseSelect.options[exerciseSelect.selectedIndex];
+                const setups = selected ? JSON.parse(selected.dataset.setups) : [];
+                document.getElementById('adaptiveSetup').innerHTML = setups.map(setup =>
+                    `<option value="${setup}">${setup.replaceAll('_', ' ')}</option>`).join('');
+                document.getElementById('adaptiveGuidance').textContent =
+                    selected ? `Required upper-body landmarks: ${catalog.exercises[selected.value].required_landmarks.join(', ')}. Use a ${JSON.parse(selected.dataset.views).join(' or ')} view.` : '';
+            };
+            exerciseSelect.addEventListener('change', updateGuidance);
+            updateGuidance();
+        } catch (error) {
+            console.error('Adaptive catalog error:', error);
+            document.getElementById('adaptiveGuidance').textContent = 'Adaptive exercise options are unavailable. Please use Standard Training or try again later.';
+        }
     }
 }
 
@@ -203,6 +242,12 @@ async function startSession(e) {
     const selectedOption = skillSelect.options[skillSelect.selectedIndex];
     const targetRepsInput = document.getElementById('targetReps');
     const targetReps = targetRepsInput && targetRepsInput.value ? parseInt(targetRepsInput.value, 10) : null;
+    const adaptiveMode = document.querySelector('input[name="trainingMode"]:checked')?.value === 'adaptive';
+    const adaptive = adaptiveMode ? {
+        setup: document.getElementById('adaptiveSetup').value,
+        exercise: document.getElementById('adaptiveExercise').value,
+        camera_view: document.getElementById('adaptiveCamera').value
+    } : null;
 
     if (!sessionType) {
         alert('Please select a session type');
@@ -228,7 +273,8 @@ async function startSession(e) {
             body: JSON.stringify({
                 sport_type: athlete.sport_type,
                 session_type: sessionType,
-                skill_name: selectedSkill.name
+                skill_name: selectedSkill.name,
+                adaptive
             })
         });
 
@@ -280,6 +326,7 @@ async function startSession(e) {
             skill: selectedSkill,
             sessionType,
             targetReps: targetReps && targetReps > 0 ? targetReps : null,
+            adaptive,
             startedAt: Date.now()
         }));
 

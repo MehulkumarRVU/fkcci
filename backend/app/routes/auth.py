@@ -17,6 +17,7 @@ from ..config import settings
 from ..sports_registry import is_valid_sport, VALID_SPORTS
 from ..services.auth_service import AuthService
 from ..services.email_service import send_password_reset_email
+from ..adaptive_training import AdaptiveProfileInput
 
 try:
     import bcrypt
@@ -41,6 +42,7 @@ class AthleteCreate(BaseModel):
     dominant_hand: Optional[str] = "right"
     height: Optional[float] = None
     weight: Optional[float] = None
+    adaptive_profile: Optional[AdaptiveProfileInput] = None
 
 
 class CoachCreate(BaseModel):
@@ -77,6 +79,8 @@ class AthleteResponse(BaseModel):
     total_sessions: int
     performance_rating: float
     created_at: datetime
+    adaptive_mode_enabled: bool = False
+    adaptive_profile: Optional[dict] = None
 
 
 class AthleteProfileUpdate(BaseModel):
@@ -133,6 +137,8 @@ def athlete_to_response(athlete: Athlete) -> AthleteResponse:
         total_sessions=athlete.total_sessions,
         performance_rating=athlete.performance_rating,
         created_at=athlete.created_at,
+        adaptive_mode_enabled=bool(athlete.adaptive_mode_enabled),
+        adaptive_profile=athlete.adaptive_profile,
     )
 
 
@@ -249,7 +255,12 @@ async def signup(athlete_data: AthleteCreate, db: Session = Depends(get_db)):
         skill_level=athlete_data.skill_level,
         dominant_hand=athlete_data.dominant_hand,
         height=athlete_data.height,
-        weight=athlete_data.weight
+        weight=athlete_data.weight,
+        adaptive_mode_enabled=bool(athlete_data.adaptive_profile and athlete_data.adaptive_profile.enabled),
+        adaptive_profile=(
+            athlete_data.adaptive_profile.model_dump(exclude={"enabled"})
+            if athlete_data.adaptive_profile else None
+        )
     )
     
     db.add(new_athlete)

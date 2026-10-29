@@ -93,7 +93,17 @@ class BaseAnalyzer(ABC):
         call for API responses; analyze_frame stays the simpler internal
         per-frame primitive used inside analyze_session."""
         result = dict(self.analyze_frame(landmarks, skill_name, skill_level, dominant_hand))
-        result.setdefault("pose_confidence", round(DEFAULT_GATE.coverage(landmarks), 2))
+        quality = DEFAULT_GATE.frame_quality(landmarks)
+        result["pose_confidence"] = round(float(quality["coverage"]), 2)
+        result["evaluation_status"] = "reliable" if quality["is_reliable"] else "insufficient_evidence"
+        result["reliability_reasons"] = list(quality["reasons"])
+        if not quality["is_reliable"]:
+            result["score"] = None
+            result["technique_accuracy"] = None
+            result["balance_score"] = None
+            result["feedback"] = [
+                "⚠️ Unable to evaluate reliably - move fully into frame and repeat the movement."
+            ]
         result.setdefault("calibration_status", CALIBRATION_STATUS)
         return result
 
@@ -113,31 +123,51 @@ class BaseAnalyzer(ABC):
         should call `super().analyze_session(...)` and merge extra `detailed`
         keys into the result rather than reimplementing aggregation.
         """
-        overall_coverage = DEFAULT_GATE.coverage(
-            [lm for frame in pose_sequence for lm in frame]
-        ) if pose_sequence else 0.0
+        frame_qualities = [DEFAULT_GATE.frame_quality(frame) for frame in pose_sequence]
+        overall_coverage = (
+            sum(float(q["coverage"]) for q in frame_qualities) / len(frame_qualities)
+            if frame_qualities else 0.0
+        )
 
         kept_frames, kept_timestamps = reject_low_confidence_frames(pose_sequence, timestamps)
         if not kept_frames:
             return {
-                "overall_score": 0.0,
-                "technique_accuracy": 0.0,
-                "balance_score": 0.0,
+                "overall_score": None,
+                "technique_accuracy": None,
+                "balance_score": None,
                 "reaction_score": None,
                 "reaction_status": "insufficient_data",
                 "pose_confidence": round(overall_coverage, 2),
                 "calibration_status": CALIBRATION_STATUS,
                 "frame_count": 0,
+                "evaluation_status": "insufficient_evidence",
+                "reliability_reasons": ["no_reliably_visible_frames"],
             }
 
         smoothed_frames = smooth_landmarks(kept_frames)
         frame_results = [
-            self.analyze_frame(frame, skill_name, skill_level, dominant_hand) for frame in smoothed_frames
+            self.analyze_frame_full(frame, skill_name, skill_level, dominant_hand)
+            for frame in smoothed_frames
         ]
 
-        scores = [r["score"] for r in frame_results]
-        tech = [r["technique_accuracy"] for r in frame_results]
-        bal = [r["balance_score"] for r in frame_results]
+        reliable_results = [r for r in frame_results if r.get("score") is not None]
+        if not reliable_results:
+            return {
+                "overall_score": None,
+                "technique_accuracy": None,
+                "balance_score": None,
+                "reaction_score": None,
+                "reaction_status": "insufficient_data",
+                "pose_confidence": round(overall_coverage, 2),
+                "calibration_status": CALIBRATION_STATUS,
+                "frame_count": 0,
+                "evaluation_status": "insufficient_evidence",
+                "reliability_reasons": ["no_reliably_scored_frames"],
+            }
+
+        scores = [r["score"] for r in reliable_results]
+        tech = [r["technique_accuracy"] for r in reliable_results]
+        bal = [r["balance_score"] for r in reliable_results]
 
         smoothed_scores = smooth_series(scores)
         smoothed_tech = smooth_series(tech)
@@ -157,4 +187,6 @@ class BaseAnalyzer(ABC):
             "pose_confidence": round(overall_coverage, 2),
             "calibration_status": CALIBRATION_STATUS,
             "frame_count": len(frame_results),
+            "evaluation_status": "reliable",
+            "reliability_reasons": [],
         }

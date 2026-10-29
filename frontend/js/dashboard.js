@@ -6,7 +6,11 @@
 // appears, so that second include never registered as a real script tag.
 // Extracted into its own file (matching every other page's pattern) and fixed.
 
-const API_URL = 'http://localhost:8080';
+const API_URL = window.POCKETCOACH_API_URL || (
+    window.location.port === '3000' || window.location.port === '5500'
+        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        : ''
+);
 requireAuth();
 
 // Logout functionality
@@ -48,30 +52,37 @@ async function loadDashboard() {
         // Update stats
         document.getElementById('totalSessions').textContent = stats.total_sessions;
         document.getElementById('totalMinutes').textContent = stats.total_minutes;
-        document.getElementById('avgPerformance').textContent = stats.average_performance;
-        document.getElementById('avgTechnique').textContent = stats.average_technique;
+        const scoreOrNA = (value) => value === null || value === undefined ? 'N/A' : value;
+        document.getElementById('avgPerformance').textContent = scoreOrNA(stats.average_performance);
+        document.getElementById('avgTechnique').textContent = scoreOrNA(stats.average_technique);
         // average_reaction is honestly null when no session in the summary
         // window had a measured reaction score - show "N/A" rather than
         // rendering the literal string "null" or coercing it to 0.
         const reactionDisplay = stats.average_reaction === null || stats.average_reaction === undefined
             ? 'N/A' : stats.average_reaction;
         document.getElementById('reactionScore').textContent = reactionDisplay;
-        document.getElementById('balanceScore').textContent = stats.average_balance;
+        document.getElementById('balanceScore').textContent = scoreOrNA(stats.average_balance);
 
         // Update progress bars
         const reactionPct = stats.average_reaction === null || stats.average_reaction === undefined ? 0 : stats.average_reaction;
         document.getElementById('reactionProgress').style.width = `${reactionPct}%`;
         document.getElementById('reactionProgress').textContent =
             stats.average_reaction === null || stats.average_reaction === undefined ? 'N/A' : `${reactionPct}%`;
-        document.getElementById('balanceProgress').style.width = `${stats.average_balance}%`;
-        document.getElementById('balanceProgress').textContent = `${stats.average_balance}%`;
+        const balancePct = stats.average_balance === null || stats.average_balance === undefined ? 0 : stats.average_balance;
+        document.getElementById('balanceProgress').style.width = `${balancePct}%`;
+        document.getElementById('balanceProgress').textContent =
+            stats.average_balance === null || stats.average_balance === undefined ? 'N/A' : `${balancePct}%`;
 
         // Apply score colors
-        applyScoreColor('avgPerformance', stats.average_performance);
+        if (stats.average_performance !== null && stats.average_performance !== undefined) {
+            applyScoreColor('avgPerformance', stats.average_performance);
+        }
         if (stats.average_reaction !== null && stats.average_reaction !== undefined) {
             applyScoreColor('reactionScore', stats.average_reaction);
         }
-        applyScoreColor('balanceScore', stats.average_balance);
+        if (stats.average_balance !== null && stats.average_balance !== undefined) {
+            applyScoreColor('balanceScore', stats.average_balance);
+        }
 
         // Load recent sessions
         await loadRecentSessions();
@@ -189,6 +200,7 @@ async function loadRecentSessions() {
             return;
         }
 
+        const scoreOrNA = (value) => value === null || value === undefined ? 'N/A' : value;
         container.innerHTML = sessions.map(session => `
             <a href="session-detail.html?id=${session.id}" class="card" style="display: block; color: inherit; text-decoration: none; cursor: pointer;">
                 <div class="flex justify-between align-center">
@@ -198,20 +210,20 @@ async function loadRecentSessions() {
                     </div>
                     <div class="text-right">
                         <div class="score-display ${getScoreClass(session.performance_score)}" style="font-size: 2rem;">
-                            ${session.performance_score}
+                            ${scoreOrNA(session.performance_score)}
                         </div>
                         <p style="font-size: 0.875rem; color: var(--text-secondary);">Performance</p>
                     </div>
                 </div>
                 <div class="grid grid-3 gap-2 mt-2">
                     <div>
-                        <strong>Technique:</strong> ${session.technique_accuracy}
+                        <strong>Technique:</strong> ${scoreOrNA(session.technique_accuracy)}
                     </div>
                     <div>
-                        <strong>Reaction:</strong> ${session.reaction_score === null ? 'N/A' : session.reaction_score}
+                        <strong>Reaction:</strong> ${scoreOrNA(session.reaction_score)}
                     </div>
                     <div>
-                        <strong>Balance:</strong> ${session.balance_score}
+                        <strong>Balance:</strong> ${scoreOrNA(session.balance_score)}
                     </div>
                 </div>
             </a>
@@ -253,6 +265,7 @@ function applyScoreColor(elementId, score) {
 }
 
 function getScoreClass(score) {
+    if (score === null || score === undefined) return 'unevaluable';
     if (score >= 90) return 'excellent';
     if (score >= 75) return 'good';
     if (score >= 60) return 'average';

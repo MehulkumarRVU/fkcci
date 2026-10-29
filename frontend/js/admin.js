@@ -1,5 +1,10 @@
 // Admin Dashboard JavaScript
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_ORIGIN = window.POCKETCOACH_API_URL || (
+    window.location.port === '3000' || window.location.port === '5500'
+        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        : ''
+);
+const API_BASE_URL = `${API_ORIGIN}/api`;
 let currentCoach = null;
 let coachAthletes = [];
 

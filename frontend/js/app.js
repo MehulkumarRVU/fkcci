@@ -1,5 +1,9 @@
 // PocketCoach AI - Main Application Logic
-const API_URL = 'http://localhost:8080';
+const API_URL = window.POCKETCOACH_API_URL || (
+    window.location.port === '3000' || window.location.port === '5500'
+        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        : ''
+);
 
 // Helper function to check authentication
 function isAuthenticated() {
@@ -77,25 +81,10 @@ function getScoreClass(score) {
 // Get sport display name
 function getSportDisplayName(sportType) {
     const map = {
-        table_tennis: '🏓 Table Tennis',
         boxing: '🥊 Boxing',
+        table_tennis: '🏓 Table Tennis',
+        gym: '🏋️ Gym',
         badminton: '🏸 Badminton',
-        tennis: '🎾 Tennis',
-        pickleball: '🥎 Pickleball',
-        squash: '🏓 Squash',
-        kickboxing: '🥊 Kickboxing',
-        muay_thai: '🦵 Muay Thai',
-        karate: '🥋 Karate',
-        taekwondo: '🥋 Taekwondo',
-        judo: '🥋 Judo',
-        bjj: '🥋 BJJ',
-        wrestling: '🤼 Wrestling',
-        fencing: '🤺 Fencing',
-        basketball: '🏀 Basketball',
-        volleyball: '🏐 Volleyball',
-        handball: '🤾 Handball',
-        indoor_archery: '🏹 Indoor Archery',
-        ai_gym_coach: '🏋️ AI Gym Coach',
         stretching: '🤸 Stretching',
         mobility_training: '🦴 Mobility Training',
         rehabilitation: '🩺 Rehabilitation',
@@ -107,25 +96,10 @@ function getSportDisplayName(sportType) {
 
 function getSportIcon(sportType) {
     const map = {
-        table_tennis: '🏓',
         boxing: '🥊',
+        table_tennis: '🏓',
+        gym: '🏋️',
         badminton: '🏸',
-        tennis: '🎾',
-        pickleball: '🥎',
-        squash: '🏓',
-        kickboxing: '🥊',
-        muay_thai: '🦵',
-        karate: '🥋',
-        taekwondo: '🥋',
-        judo: '🥋',
-        bjj: '🥋',
-        wrestling: '🤼',
-        fencing: '🤺',
-        basketball: '🏀',
-        volleyball: '🏐',
-        handball: '🤾',
-        indoor_archery: '🏹',
-        ai_gym_coach: '🏋️',
         stretching: '🤸',
         mobility_training: '🦴',
         rehabilitation: '🩺',
@@ -139,62 +113,20 @@ function getSportIcon(sportType) {
 // the same way as the backend's registry (backend/app/sports_registry.py)
 // - table_tennis/boxing/badminton get their own detailed cards above and
 // are excluded here.
-const MORE_SPORT_CATEGORIES = [
-    {
-        category: 'Racket Sports',
-        sports: [
-            { key: 'tennis', name: 'Tennis', icon: '🎾' },
-            { key: 'pickleball', name: 'Pickleball', icon: '🥎' },
-            { key: 'squash', name: 'Squash', icon: '🏓' },
-        ],
-    },
-    {
-        category: 'Combat & Martial Arts',
-        sports: [
-            { key: 'kickboxing', name: 'Kickboxing', icon: '🥊' },
-            { key: 'muay_thai', name: 'Muay Thai', icon: '🦵' },
-            { key: 'karate', name: 'Karate', icon: '🥋' },
-            { key: 'taekwondo', name: 'Taekwondo', icon: '🥋' },
-            { key: 'judo', name: 'Judo', icon: '🥋' },
-            { key: 'bjj', name: 'Brazilian Jiu-Jitsu', icon: '🥋' },
-            { key: 'wrestling', name: 'Wrestling', icon: '🤼' },
-            { key: 'fencing', name: 'Fencing', icon: '🤺' },
-            { key: 'wwe', name: 'WWE', icon: '🤼' },
-        ],
-    },
-    {
-        category: 'Court & Team Sports',
-        sports: [
-            { key: 'basketball', name: 'Basketball', icon: '🏀' },
-            { key: 'volleyball', name: 'Volleyball', icon: '🏐' },
-            { key: 'handball', name: 'Handball', icon: '🤾' },
-            { key: 'football', name: 'Football', icon: '⚽' },
-            { key: 'baseball', name: 'Baseball', icon: '⚾' },
-            { key: 'cricket', name: 'Cricket', icon: '🏏' },
-            { key: 'hockey', name: 'Hockey', icon: '🏒' },
-            { key: 'ice_hockey', name: 'Ice Hockey', icon: '🏒' },
-            { key: 'kabaddi', name: 'Kabaddi', icon: '🏅' },
-        ],
-    },
-    {
-        category: 'Precision & Fitness',
-        sports: [
-            { key: 'indoor_archery', name: 'Indoor Archery', icon: '🏹' },
-            { key: 'ai_gym_coach', name: 'AI Gym Coach', icon: '🏋️' },
-            { key: 'stretching', name: 'Stretching', icon: '🤸' },
-            { key: 'mobility_training', name: 'Mobility Training', icon: '🦴' },
-            { key: 'rehabilitation', name: 'Rehabilitation', icon: '🩺' },
-            { key: 'home_workouts', name: 'Home Workouts', icon: '🏠' },
-            { key: 'calisthenics', name: 'Calisthenics', icon: '💪' },
-            { key: 'weight_lifting', name: 'Weight Lifting', icon: '🏋️' },
-            { key: 'gymnastics', name: 'Gymnastics', icon: '🤸' },
-            { key: 'shooting', name: 'Shooting', icon: '🎯' },
-            { key: 'swimming', name: 'Swimming', icon: '🏊' },
-            { key: 'formula1', name: 'Formula 1', icon: '🏎️' },
-            { key: 'motogp', name: 'MotoGP', icon: '🏍️' },
-        ],
-    },
-];
+const MORE_SPORT_CATEGORIES = [{
+    category: 'Training categories',
+    sports: [
+        { key: 'boxing', name: 'Boxing', icon: '🥊' },
+        { key: 'table_tennis', name: 'Table Tennis', icon: '🏓' },
+        { key: 'gym', name: 'Gym', icon: '🏋️' },
+        { key: 'badminton', name: 'Badminton', icon: '🏸' },
+        { key: 'stretching', name: 'Stretching', icon: '🤸' },
+        { key: 'mobility_training', name: 'Mobility Training', icon: '🦴' },
+        { key: 'rehabilitation', name: 'Rehabilitation', icon: '🩺' },
+        { key: 'home_workouts', name: 'Home Workouts', icon: '🏠' },
+        { key: 'calisthenics', name: 'Calisthenics', icon: '💪' },
+    ],
+}];
 
 function renderMoreSportsGrid() {
     const container = document.getElementById('moreSportsContainer');

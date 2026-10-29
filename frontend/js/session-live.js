@@ -1,9 +1,14 @@
 // PocketCoach AI - Live Session Module
-const API_URL = 'http://localhost:8080';
+const API_URL = window.POCKETCOACH_API_URL || (
+    window.location.port === '3000' || window.location.port === '5500'
+        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        : ''
+);
 
 requireAuth();
 
 let currentSession = null;
+let adaptiveConfig = null;
 let currentSkill = null;
 let poseDetector = null;
 let sportsAnalyzer = null;
@@ -63,6 +68,7 @@ async function initLiveSession() {
 
     const activeSession = JSON.parse(activeSessionRaw);
     currentSession = activeSession.session;
+    adaptiveConfig = activeSession.adaptive || null;
     currentSkill = activeSession.skill;
     sessionType = activeSession.sessionType;
     sessionStartTime = activeSession.startedAt || Date.now();
@@ -288,6 +294,19 @@ function speakFeedback(feedbackList) {
 function onPoseResults(landmarks) {
     if (isPaused) return;
 
+    const quality = poseDetector.getLandmarkQuality(landmarks);
+    if (!quality.reliable) {
+        const feedbackPanel = document.getElementById('feedbackPanel');
+        feedbackPanel.innerHTML = sportsAnalyzer.formatFeedback([
+            '⚠️ Unable to evaluate reliably - move fully into frame and repeat the movement.'
+        ]);
+        document.getElementById('liveScoreStatus').textContent =
+            `Pose quality too low (${Math.round(quality.coverage * 100)}%)`;
+        sportsAnalyzer.addPoseSample(poseDetector.landmarksToArray(landmarks), Date.now());
+        return;
+    }
+
+    document.getElementById('liveScoreStatus').textContent = '';
     const localAnalysis = sportsAnalyzer.analyzeLocally(landmarks, currentSkill.name);
 
     // Feedback tips (text) are still shown instantly - they're just
@@ -332,7 +351,8 @@ async function sendToBackendForAnalysis(landmarks) {
             body: JSON.stringify({
                 sport_type: athlete.sport_type,
                 skill_name: currentSkill.name,
-                landmarks: landmarksArray
+                landmarks: landmarksArray,
+                adaptive: adaptiveConfig
             })
         });
 
@@ -456,22 +476,17 @@ async function endSession() {
     }
 
     const durationMinutes = Math.floor((Date.now() - sessionStartTime - pausedAccumulatedMs) / 60000);
-    const avgScore = sportsAnalyzer.getAverageScore();
-
-    // Fallback values from real per-response server measurements tracked
-    // throughout the session (used only if the full-session analysis below
-    // can't run, e.g. an empty buffer or a network error) - never a
-    // fabricated multiplier of one client-side average.
-    const avgTechnique = sportsAnalyzer.getAverageTechnique();
-    const avgBalance = sportsAnalyzer.getAverageBalance();
-
     let sessionUpdate = {
         end_time: new Date().toISOString(),
         duration_minutes: durationMinutes,
         is_completed: true,
-        performance_score: avgScore,
-        technique_accuracy: avgTechnique !== null ? avgTechnique : avgScore,
-        balance_score: avgBalance !== null ? avgBalance : avgScore
+        performance_score: null,
+        technique_accuracy: null,
+        balance_score: null,
+        session_data: {
+            evaluation_status: 'insufficient_evidence',
+            reason: 'No reliable full-session analysis was completed.'
+        }
     };
 
     // Full-session analysis: temporal smoothing, low-confidence frame
@@ -487,7 +502,8 @@ async function endSession() {
                     sport_type: athlete.sport_type,
                     skill_name: currentSkill.name,
                     pose_data: poseBuffer,
-                    session_id: currentSession.id
+                    session_id: currentSession.id,
+                    adaptive: adaptiveConfig
                 })
             });
             if (response.ok) {
@@ -500,17 +516,23 @@ async function endSession() {
                         balance_score: analysis.balance_score,
                         // null when reaction_status isn't "measured" - stored
                         // as an honest missing value, never a fabricated number.
-                        reaction_score: analysis.reaction_score,
+                        reaction_score: analysis.reaction_score ?? null,
                         session_data: {
                             reaction_status: analysis.reaction_status,
                             pose_confidence: analysis.pose_confidence,
-                            calibration_status: analysis.calibration_status
+                            calibration_status: analysis.calibration_status,
+                            evaluation_status: analysis.evaluation_status,
+                            reliability_reasons: analysis.reliability_reasons
                         },
                         joint_summary: (analysis.detailed_analysis && analysis.detailed_analysis.joint_deviation_summary) || null
                     };
                     serverDetailedCounts = (analysis.detailed_analysis && analysis.detailed_analysis.detailed) || null;
                 } else if (analysis.supported === false) {
                     console.warn('Session analysis not supported for this sport:', analysis.reason);
+                    sessionUpdate.session_data = {
+                        evaluation_status: 'unsupported',
+                        reason: analysis.reason
+                    };
                 }
             }
         } catch (error) {
@@ -546,16 +568,19 @@ function getSessionTypeHint(sessionType) {
 }
 
 function showSessionSummary(session, serverDetailedCounts) {
-    document.getElementById('summaryScore').textContent = Math.round(session.performance_score);
-    document.getElementById('summaryTechnique').textContent = Math.round(session.technique_accuracy);
+    const formatScore = (value) => typeof value === 'number' ? Math.round(value) : 'N/A';
+    document.getElementById('summaryScore').textContent = formatScore(session.performance_score);
+    document.getElementById('summaryTechnique').textContent = formatScore(session.technique_accuracy);
     document.getElementById('summaryReaction').textContent =
-        session.reaction_score === null || session.reaction_score === undefined ? 'N/A' : Math.round(session.reaction_score);
-    document.getElementById('summaryBalance').textContent = Math.round(session.balance_score);
+        formatScore(session.reaction_score);
+    document.getElementById('summaryBalance').textContent = formatScore(session.balance_score);
     document.getElementById('summaryDuration').textContent = session.duration_minutes;
 
     const scoreDisplay = document.getElementById('summaryScore');
     scoreDisplay.className = 'score-display';
-    if (session.performance_score >= 90) scoreDisplay.classList.add('excellent');
+    if (typeof session.performance_score !== 'number') {
+        scoreDisplay.classList.add('unevaluable');
+    } else if (session.performance_score >= 90) scoreDisplay.classList.add('excellent');
     else if (session.performance_score >= 75) scoreDisplay.classList.add('good');
     else if (session.performance_score >= 60) scoreDisplay.classList.add('average');
     else scoreDisplay.classList.add('poor');

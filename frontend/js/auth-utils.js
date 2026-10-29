@@ -1,5 +1,9 @@
 // PocketCoach AI - Shared authentication utilities
-const AUTH_API_URL = window.API_URL || 'http://localhost:8080';
+const AUTH_API_URL = window.POCKETCOACH_API_URL || (
+    window.location.port === '3000' || window.location.port === '5500'
+        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        : ''
+);
 
 function getAuthToken() {
     return localStorage.getItem('token');

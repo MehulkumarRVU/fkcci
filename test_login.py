@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
+import sys
 import requests
 import json
+
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 
 BASE_URL = "http://localhost:8080/api"
 

@@ -103,11 +103,11 @@ class SportsAnalyzer {
         // Sport-specific checks. motogp/formula1 are intentionally excluded -
         // seated/helmeted/vehicle-occluded activities aren't assessable via
         // webcam pose analysis (mirrors backend AnalyzerFactory.NOT_POSE_COACHABLE).
-        const racketSports = ['table_tennis', 'badminton', 'tennis', 'pickleball', 'squash'];
-        const combatSports = ['boxing', 'kickboxing', 'muay_thai', 'karate', 'taekwondo', 'judo', 'bjj', 'wrestling', 'fencing', 'kabaddi', 'wwe'];
-        const courtSports = ['basketball', 'volleyball', 'handball', 'football', 'baseball', 'cricket', 'hockey', 'ice_hockey'];
+        const racketSports = ['table_tennis', 'badminton'];
+        const combatSports = ['boxing'];
+        const courtSports = [];
         const archerySports = ['indoor_archery', 'shooting'];
-        const fitnessSports = ['ai_gym_coach', 'weight_lifting', 'stretching', 'mobility_training', 'rehabilitation', 'home_workouts', 'calisthenics', 'gymnastics', 'swimming'];
+        const fitnessSports = ['gym', 'stretching', 'mobility_training', 'rehabilitation', 'home_workouts', 'calisthenics'];
 
         if (this.sportType === 'boxing') {
             this.analyzeBoxingLocal(landmarks, skillName, feedback);

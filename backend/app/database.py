@@ -65,6 +65,12 @@ def init_database() -> None:
         if "last_session_date" not in column_names:
             connection.execute(text("ALTER TABLE athletes ADD COLUMN last_session_date DATE"))
 
+        if "adaptive_mode_enabled" not in column_names:
+            connection.execute(text("ALTER TABLE athletes ADD COLUMN adaptive_mode_enabled BOOLEAN DEFAULT 0 NOT NULL"))
+
+        if "adaptive_profile" not in column_names:
+            connection.execute(text("ALTER TABLE athletes ADD COLUMN adaptive_profile JSON"))
+
         connection.execute(
             text(
                 """
@@ -86,6 +92,18 @@ def init_database() -> None:
 
         if "joint_summary" not in session_column_names:
             connection.execute(text("ALTER TABLE sessions ADD COLUMN joint_summary TEXT"))
+
+        if "adaptive_mode" not in session_column_names:
+            connection.execute(text("ALTER TABLE sessions ADD COLUMN adaptive_mode BOOLEAN DEFAULT 0 NOT NULL"))
+
+        if "adaptive_setup" not in session_column_names:
+            connection.execute(text("ALTER TABLE sessions ADD COLUMN adaptive_setup VARCHAR"))
+
+        if "adaptive_exercise" not in session_column_names:
+            connection.execute(text("ALTER TABLE sessions ADD COLUMN adaptive_exercise VARCHAR"))
+
+        if "adaptive_reference" not in session_column_names:
+            connection.execute(text("ALTER TABLE sessions ADD COLUMN adaptive_reference JSON"))
 
     # Seed default skills if none exist yet
     from .seed_data import seed_default_skills_if_empty

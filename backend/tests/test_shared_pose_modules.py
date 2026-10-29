@@ -10,6 +10,8 @@ from app.pose_engine.shared.confidence import ConfidenceGate
 from app.pose_engine.shared.mirroring import get_dominant_and_off_side, boxing_stance_sides
 from app.pose_engine.shared.skill_profiles import widen_range, scale_penalty
 from app.pose_engine.shared.reaction import measure_state_transition_reaction
+from app.pose_engine.shared.normalization import normalize_landmarks
+from app.pose_engine.shared.smoothing import smooth_landmarks
 from app.pose_engine.analyzer_factory import AnalyzerFactory, NOT_YET_IMPLEMENTED, NOT_POSE_COACHABLE
 from app.sports_registry import get_supported_sport_types
 
@@ -43,6 +45,35 @@ def test_confidence_gate_partial_coverage():
         landmarks[i]["visibility"] = 0.0
     coverage = gate.coverage(landmarks)
     assert 0.0 < coverage < 1.0
+
+
+def test_confidence_gate_rejects_invalid_coordinates_and_missing_torso():
+    gate = ConfidenceGate()
+    landmarks = make_landmarks()
+    landmarks[11]["x"] = float("nan")
+    landmarks[23]["visibility"] = 0.0
+    quality = gate.frame_quality(landmarks)
+    assert quality["is_reliable"] is False
+    assert "invalid_landmark_coordinates" in quality["reasons"]
+    assert "torso_not_reliably_visible" in quality["reasons"]
+
+
+def test_normalization_is_body_relative_and_preserves_visibility():
+    landmarks = make_landmarks()
+    normalized = normalize_landmarks(landmarks)
+    assert abs((normalized[23]["x"] + normalized[24]["x"]) / 2) < 1e-9
+    assert abs((normalized[23]["y"] + normalized[24]["y"]) / 2) < 1e-9
+    assert normalized[0]["visibility"] == landmarks[0]["visibility"]
+
+
+def test_smoothing_does_not_replace_occluded_landmark_with_previous_position():
+    first = make_landmarks()
+    second = make_landmarks()
+    second[15]["visibility"] = 0.0
+    second[15]["x"] = 0.0
+    smoothed = smooth_landmarks([first, second])
+    assert smoothed[1][15]["visibility"] == 0.0
+    assert smoothed[1][15]["x"] == 0.0
 
 
 # ---- Mirroring ----

@@ -76,28 +76,13 @@
                 </div>
                 <div id="athleteFields">
                     <div class="form-group">
-                        <label class="form-label" for="sportType">Select Your Sport</label>
+                        <label class="form-label" for="sportType">Select Your Training Category</label>
                             <select id="sportType" class="form-select" required>
                                 <option value="">Choose a sport...</option>
-                                <option value="table_tennis">🏓 Table Tennis</option>
                                 <option value="boxing">🥊 Boxing</option>
+                                <option value="table_tennis">🏓 Table Tennis</option>
+                                <option value="gym">🏋️ Gym</option>
                                 <option value="badminton">🏸 Badminton</option>
-                                <option value="tennis">🎾 Tennis</option>
-                                <option value="pickleball">🥎 Pickleball</option>
-                                <option value="squash">🏓 Squash</option>
-                                <option value="kickboxing">🥊 Kickboxing</option>
-                                <option value="muay_thai">🦵 Muay Thai</option>
-                                <option value="karate">🥋 Karate</option>
-                                <option value="taekwondo">🥋 Taekwondo</option>
-                                <option value="judo">🥋 Judo</option>
-                                <option value="bjj">🥋 Brazilian Jiu-Jitsu (BJJ)</option>
-                                <option value="wrestling">🤼 Wrestling</option>
-                                <option value="fencing">🤺 Fencing</option>
-                                <option value="basketball">🏀 Basketball</option>
-                                <option value="volleyball">🏐 Volleyball</option>
-                                <option value="handball">🤾 Handball</option>
-                                <option value="indoor_archery">🏹 Indoor Archery</option>
-                                <option value="ai_gym_coach">🏋️ AI Gym Coach</option>
                                 <option value="stretching">🤸 Stretching</option>
                                 <option value="mobility_training">🦴 Mobility Training</option>
                                 <option value="rehabilitation">🩺 Rehabilitation</option>
@@ -130,6 +115,22 @@
                             <input type="number" id="weight" class="form-input" min="30" max="200">
                         </div>
                     </div>
+                    <fieldset class="form-group">
+                        <legend class="form-label">Training mode</legend>
+                        <label><input type="radio" name="signupTrainingMode" value="standard" checked> Standard Training</label>
+                        <label style="margin-left: 1rem;"><input type="radio" name="signupTrainingMode" value="adaptive"> Adaptive Training</label>
+                    </fieldset>
+                    <div id="signupAdaptiveOptions" class="form-group hidden" aria-live="polite">
+                        <label class="form-label" for="signupAdaptiveSetup">Preferred training setup</label>
+                        <select id="signupAdaptiveSetup" class="form-select">
+                            <option value="standing">Standing</option>
+                            <option value="seated">Seated</option>
+                            <option value="wheelchair">Wheelchair-based</option>
+                        </select>
+                        <label class="form-label" for="signupAdaptivePreferences">Accessibility preferences</label>
+                        <input id="signupAdaptivePreferences" class="form-input" placeholder="Optional, comma-separated preferences">
+                        <p role="status" style="color: var(--text-secondary);">You can change or remove these settings later. No diagnosis or disability information is required.</p>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%;">Create Account</button>
             </form>
@@ -145,7 +146,7 @@
         </div>
     </div>
 
-    <script src="../js/auth-utils.js?v=2"></script>
-    <script src="../js/auth.js?v=2"></script>
+    <script src="../js/auth-utils.js?v=4"></script>
+    <script src="../js/auth.js?v=4"></script>
 </body>
 </html>

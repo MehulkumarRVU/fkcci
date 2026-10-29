@@ -45,10 +45,10 @@ def make_frame():
     return landmarks
 
 
-def test_tennis_analyze_endpoint():
+def test_supported_racket_analyze_endpoint():
     payload = {
-        "sport_type": "tennis",
-        "skill_name": "Serve",
+        "sport_type": "badminton",
+        "skill_name": "Serve Technique",
         "pose_data": [
             {"landmarks": make_frame(), "timestamp": 0.0},
             {"landmarks": make_frame(), "timestamp": 0.033},
@@ -58,6 +58,6 @@ def test_tennis_analyze_endpoint():
     resp = client.post("/api/analysis/analyze", json=payload)
     assert resp.status_code == 200, resp.text
     data = resp.json()
-    assert data["sport_type"] == "tennis"
+    assert data["sport_type"] == "badminton"
     assert "overall_score" in data
     assert isinstance(data["feedback_messages"], list)

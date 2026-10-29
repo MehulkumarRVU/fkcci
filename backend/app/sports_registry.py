@@ -1,14 +1,30 @@
-from typing import Dict, List, Optional
+"""Canonical training-category registry.
 
-SUPPORTED_SPORTS: Dict[str, Dict[str, str]] = {
-    "table_tennis": {"name": "Table Tennis", "icon": "🏓"},
+Only ACTIVE_CATEGORIES are selectable for new accounts, skills, sessions, and
+analysis requests. LEGACY_CATEGORIES remain readable as metadata for
+historical rows and are intentionally excluded from validation.
+"""
+from typing import Dict, List
+
+ACTIVE_CATEGORIES: Dict[str, Dict[str, str]] = {
     "boxing": {"name": "Boxing", "icon": "🥊"},
+    "table_tennis": {"name": "Table Tennis", "icon": "🏓"},
+    "gym": {"name": "Gym", "icon": "🏋️"},
     "badminton": {"name": "Badminton", "icon": "🏸"},
-    # Racket Sports
+    "stretching": {"name": "Stretching", "icon": "🤸"},
+    "mobility_training": {"name": "Mobility Training", "icon": "🦴"},
+    "rehabilitation": {"name": "Rehabilitation", "icon": "🩺"},
+    "home_workouts": {"name": "Home Workouts", "icon": "🏠"},
+    "calisthenics": {"name": "Calisthenics", "icon": "💪"},
+}
+
+# Historical values remain displayable but cannot be selected or written to
+# through current validation paths.
+LEGACY_CATEGORIES: Dict[str, Dict[str, str]] = {
+    "ai_gym_coach": {"name": "AI Gym Coach", "icon": "🏋️"},
     "tennis": {"name": "Tennis", "icon": "🎾"},
     "pickleball": {"name": "Pickleball", "icon": "🥎"},
     "squash": {"name": "Squash", "icon": "🏓"},
-    # Combat / Martial Arts
     "kickboxing": {"name": "Kickboxing", "icon": "🥊"},
     "muay_thai": {"name": "Muay Thai", "icon": "🦵"},
     "karate": {"name": "Karate", "icon": "🥋"},
@@ -17,20 +33,11 @@ SUPPORTED_SPORTS: Dict[str, Dict[str, str]] = {
     "bjj": {"name": "Brazilian Jiu-Jitsu", "icon": "🥋"},
     "wrestling": {"name": "Wrestling", "icon": "🤼"},
     "fencing": {"name": "Fencing", "icon": "🤺"},
-    # Court & Team Sports
     "basketball": {"name": "Basketball", "icon": "🏀"},
     "volleyball": {"name": "Volleyball", "icon": "🏐"},
     "handball": {"name": "Handball", "icon": "🤾"},
     "football": {"name": "Football", "icon": "⚽"},
-    # Precision & Fitness
     "indoor_archery": {"name": "Indoor Archery", "icon": "🏹"},
-    "ai_gym_coach": {"name": "AI Gym Coach", "icon": "🏋️"},
-    "stretching": {"name": "Stretching", "icon": "🤸"},
-    "mobility_training": {"name": "Mobility Training", "icon": "🦴"},
-    "rehabilitation": {"name": "Rehabilitation", "icon": "🩺"},
-    "home_workouts": {"name": "Home Workouts", "icon": "🏠"},
-    "calisthenics": {"name": "Calisthenics", "icon": "💪"},
-    # Imported archive sports
     "baseball": {"name": "Baseball", "icon": "⚾"},
     "cricket": {"name": "Cricket", "icon": "🏏"},
     "formula1": {"name": "Formula 1", "icon": "🏎️"},
@@ -45,7 +52,8 @@ SUPPORTED_SPORTS: Dict[str, Dict[str, str]] = {
     "wwe": {"name": "WWE", "icon": "🤼"},
 }
 
-VALID_SPORTS = set(SUPPORTED_SPORTS.keys())
+SUPPORTED_SPORTS = ACTIVE_CATEGORIES
+VALID_SPORTS = set(ACTIVE_CATEGORIES)
 
 
 def is_valid_sport(sport_type: str) -> bool:
@@ -53,16 +61,20 @@ def is_valid_sport(sport_type: str) -> bool:
 
 
 def get_supported_sport_types() -> List[str]:
-    return list(SUPPORTED_SPORTS.keys())
+    return list(ACTIVE_CATEGORIES)
 
 
 def get_sport_display_name(sport_type: str) -> str:
-    return SUPPORTED_SPORTS.get(sport_type, {}).get("name", sport_type)
+    metadata = ACTIVE_CATEGORIES.get(sport_type) or LEGACY_CATEGORIES.get(sport_type)
+    return metadata["name"] if metadata else sport_type
 
 
 def get_sport_icon(sport_type: str) -> str:
-    return SUPPORTED_SPORTS.get(sport_type, {}).get("icon", "🏅")
+    metadata = ACTIVE_CATEGORIES.get(sport_type) or LEGACY_CATEGORIES.get(sport_type)
+    return metadata["icon"] if metadata else "🏅"
 
 
 def get_sport_metadata(sport_type: str) -> Dict[str, str]:
-    return SUPPORTED_SPORTS.get(sport_type, {"name": sport_type, "icon": "🏅"})
+    return ACTIVE_CATEGORIES.get(sport_type) or LEGACY_CATEGORIES.get(
+        sport_type, {"name": sport_type, "icon": "🏅"}
+    )

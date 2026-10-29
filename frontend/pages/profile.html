@@ -143,6 +143,7 @@
                         <button type="button" class="dropdown-toggle" id="linkedSportsToggle">Select connected sports</button>
                         <div class="dropdown-menu" id="linkedSportsMenu"></div>
                     </div>
+
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="updateActiveSport">Active Sport</label>
@@ -167,6 +168,29 @@
                 </div>
                 <button type="submit" class="btn btn-primary">Update Preferences</button>
             </form>
+            <div class="card mt-4">
+                <h3 class="card-header">Adaptive Training</h3>
+                <form id="adaptiveProfileForm">
+                    <label class="form-label">
+                        <input type="checkbox" id="adaptiveEnabled">
+                        Enable Adaptive Training
+                    </label>
+                    <div id="profileAdaptiveOptions" class="hidden" aria-live="polite">
+                        <label class="form-label" for="adaptiveSetup">Preferred setup</label>
+                        <select id="adaptiveSetup" class="form-select">
+                            <option value="standing">Standing</option>
+                            <option value="seated">Seated</option>
+                            <option value="wheelchair">Wheelchair-based</option>
+                        </select>
+                        <label class="form-label" for="adaptivePreferences">Accessibility preferences</label>
+                        <input id="adaptivePreferences" class="form-input" placeholder="Optional, comma-separated preferences">
+                        <p id="adaptiveCapabilities" role="status" style="color: var(--text-secondary);"></p>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Adaptive Settings</button>
+                    <button type="button" id="cancelAdaptiveProfile" class="btn btn-outline">Cancel</button>
+                    <button type="button" id="removeAdaptiveProfile" class="btn btn-danger">Remove Settings</button>
+                </form>
+            </div>
         </div>
 
         <!-- Training Statistics -->
@@ -216,7 +240,7 @@
         </div>
     </div>
 
-    <script src="../js/auth-utils.js"></script>
+    <script src="../js/auth-utils.js?v=4"></script>
     <script>
         // Show admin link for coaches
         document.addEventListener('DOMContentLoaded', function() {
@@ -243,6 +267,6 @@
             }
         });
     </script>
-    <script src="../js/profile.js"></script>
+    <script src="../js/profile.js?v=4"></script>
 </body>
 </html>

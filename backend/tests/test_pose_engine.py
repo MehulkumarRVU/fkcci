@@ -58,3 +58,51 @@ def test_analysis_api_endpoint_override_auth():
         assert "overall_score" in data
     finally:
         app.dependency_overrides.pop(get_current_athlete, None)
+
+
+def test_analysis_api_rejects_unreliable_pose_without_score():
+    class DummyUser:
+        username = "testuser"
+        id = 1
+
+    from app.routes.auth import get_current_athlete
+
+    app.dependency_overrides[get_current_athlete] = lambda: DummyUser()
+    client = TestClient(app)
+    landmarks = make_simple_landmarks()
+    for landmark in landmarks:
+        landmark["visibility"] = 0.0
+    try:
+        response = client.post("/api/analysis/realtime-feedback", json={
+            "sport_type": "boxing",
+            "skill_name": "Jab",
+            "landmarks": landmarks,
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["score"] is None
+        assert data["evaluation_status"] == "insufficient_evidence"
+        assert data["reliability_reasons"]
+    finally:
+        app.dependency_overrides.pop(get_current_athlete, None)
+
+
+def test_analysis_api_rejects_unknown_skill():
+    class DummyUser:
+        username = "testuser"
+        id = 1
+
+    from app.routes.auth import get_current_athlete
+
+    app.dependency_overrides[get_current_athlete] = lambda: DummyUser()
+    client = TestClient(app)
+    try:
+        response = client.post("/api/analysis/realtime-feedback", json={
+            "sport_type": "boxing",
+            "skill_name": "Invented Movement",
+            "landmarks": make_simple_landmarks(),
+        })
+        assert response.status_code == 400
+        assert response.json()["detail"]["supported_skills"]
+    finally:
+        app.dependency_overrides.pop(get_current_athlete, None)

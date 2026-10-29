@@ -1,13 +1,33 @@
 #!/usr/bin/env python
+import sys
 import requests
+from time import time
+
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
+
+base_url = 'http://localhost:8080/api'
+username = f'formtest{int(time())}'
+password = 'TestCoach123!'
+
+signup_response = requests.post(
+    f'{base_url}/auth/signup-coach',
+    json={
+        'email': f'{username}@example.com',
+        'username': username,
+        'password': password,
+    },
+    timeout=5,
+)
+signup_response.raise_for_status()
 
 # Test login with form data (like OAuth2PasswordRequestForm expects)
 login_data = {
-    'username': 'coachverify1772362703',
-    'password': 'TestCoach123!'
+    'username': username,
+    'password': password,
 }
 
-response = requests.post('http://localhost:8080/api/auth/login', data=login_data)
+response = requests.post(f'{base_url}/auth/login', data=login_data, timeout=5)
 print(f'Status: {response.status_code}')
 if response.status_code == 200:
     data = response.json()
@@ -17,8 +37,10 @@ if response.status_code == 200:
     
     # Now test getting athlete info
     token = data.get('access_token')
-    me_response = requests.get('http://localhost:8080/api/auth/me',
+    me_headers = {'Authorization': 'Bearer ' + token}
+    me_response = requests.get(f'{base_url}/auth/me',
         headers={'Authorization': f'Bearer {token}'})
+    me_response = requests.get(f'{base_url}/auth/me', headers=me_headers, timeout=5)
     if me_response.status_code == 200:
         athlete = me_response.json()
         print(f'\n✅ /me endpoint working')

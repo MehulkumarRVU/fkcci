@@ -39,7 +39,7 @@ def test_e2e_signup_login_and_analysis():
             "email": email,
             "username": username,
             "password": password,
-            "sport_type": "tennis",
+            "sport_type": "badminton",
             "skill_level": "beginner",
         },
     )
@@ -63,8 +63,8 @@ def test_e2e_signup_login_and_analysis():
 
     # analysis request
     payload = {
-        "sport_type": "tennis",
-        "skill_name": "Serve",
+        "sport_type": "badminton",
+        "skill_name": "Serve Technique",
         "pose_data": [
             {"landmarks": make_frame(), "timestamp": 0.0},
             {"landmarks": make_frame(), "timestamp": 0.033},
@@ -73,5 +73,5 @@ def test_e2e_signup_login_and_analysis():
     analysis_resp = client.post("/api/analysis/analyze", json=payload, headers={"Authorization": f"Bearer {access_token}"})
     assert analysis_resp.status_code == 200, analysis_resp.text
     data = analysis_resp.json()
-    assert data["sport_type"] == "tennis"
+    assert data["sport_type"] == "badminton"
     assert "overall_score" in data

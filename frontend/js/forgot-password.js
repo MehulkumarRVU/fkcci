@@ -1,5 +1,9 @@
 // PocketCoach AI - Forgot Password Module
-const API_URL = 'http://localhost:8080';
+const API_URL = window.POCKETCOACH_API_URL || (
+    window.location.port === '3000' || window.location.port === '5500'
+        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        : ''
+);
 
 const forgotPasswordForm = document.getElementById('forgotPasswordForm');
 if (forgotPasswordForm) {

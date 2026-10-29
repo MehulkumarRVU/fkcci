@@ -8,6 +8,7 @@ from ..database import get_db
 from ..models.session import Session as SessionModel
 from ..models.athlete import Athlete
 from ..services.gamification_service import update_streak, check_and_award_achievements
+from ..adaptive_training import AdaptiveAnalysisConfig, ACTIVE_ADAPTIVE_CATEGORIES
 from .auth import get_current_athlete
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
@@ -20,6 +21,7 @@ class SessionCreate(BaseModel):
     sport_type: str
     session_type: str  # drill / sparring / shadow / match_simulation
     skill_name: Optional[str] = None
+    adaptive: Optional[AdaptiveAnalysisConfig] = None
 
 
 class SessionUpdate(BaseModel):
@@ -33,6 +35,10 @@ class SessionUpdate(BaseModel):
     session_data: Optional[dict] = None
     scoring_version: Optional[str] = None
     joint_summary: Optional[dict] = None
+    adaptive_mode: Optional[bool] = None
+    adaptive_setup: Optional[str] = None
+    adaptive_exercise: Optional[str] = None
+    adaptive_reference: Optional[dict] = None
 
 
 class SessionResponse(BaseModel):
@@ -45,13 +51,17 @@ class SessionResponse(BaseModel):
     end_time: Optional[datetime]
     duration_minutes: int
     is_completed: bool
-    performance_score: float
-    technique_accuracy: float
+    performance_score: Optional[float] = None
+    technique_accuracy: Optional[float] = None
     reaction_score: Optional[float] = None
-    balance_score: float
+    balance_score: Optional[float] = None
     session_data: Optional[dict]
     scoring_version: Optional[str] = None
     joint_summary: Optional[dict] = None
+    adaptive_mode: bool = False
+    adaptive_setup: Optional[str] = None
+    adaptive_exercise: Optional[str] = None
+    adaptive_reference: Optional[dict] = None
     created_at: datetime
 
     class Config:
@@ -74,6 +84,8 @@ async def create_session(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid sport_type"
         )
+    if session_data.adaptive and session_data.sport_type not in ACTIVE_ADAPTIVE_CATEGORIES:
+        raise HTTPException(status_code=400, detail="Adaptive training is unavailable for this category")
     
     # Validate session type
     valid_session_types = ["drill", "sparring", "shadow", "match_simulation"]
@@ -109,7 +121,11 @@ async def create_session(
         athlete_id=current_athlete.id,
         sport_type=session_data.sport_type,
         session_type=session_data.session_type,
-        skill_name=session_data.skill_name
+        skill_name=session_data.skill_name,
+        adaptive_mode=session_data.adaptive is not None,
+        adaptive_setup=session_data.adaptive.setup if session_data.adaptive else None,
+        adaptive_exercise=session_data.adaptive.exercise if session_data.adaptive else None,
+        adaptive_reference=session_data.adaptive.reference.model_dump() if session_data.adaptive and session_data.adaptive.reference else None,
     )
     
     db.add(new_session)
@@ -276,20 +292,29 @@ async def get_session_stats(
         }
     
     total_minutes = sum(s.duration_minutes for s in sessions)
-    avg_performance = sum(s.performance_score for s in sessions) / len(sessions)
-    avg_technique = sum(s.technique_accuracy for s in sessions) / len(sessions)
+    measured_performance = [s.performance_score for s in sessions if s.performance_score is not None]
+    measured_technique = [s.technique_accuracy for s in sessions if s.technique_accuracy is not None]
+    measured_balance = [s.balance_score for s in sessions if s.balance_score is not None]
+    avg_performance = (
+        sum(measured_performance) / len(measured_performance)
+        if measured_performance else None
+    )
+    avg_technique = (
+        sum(measured_technique) / len(measured_technique)
+        if measured_technique else None
+    )
     # reaction_score is nullable (honest "not measured" instead of a
     # fabricated number) - average only over sessions where it was actually
     # measured rather than crashing or silently treating None as 0.
     measured_reactions = [s.reaction_score for s in sessions if s.reaction_score is not None]
     avg_reaction = sum(measured_reactions) / len(measured_reactions) if measured_reactions else None
-    avg_balance = sum(s.balance_score for s in sessions) / len(sessions)
+    avg_balance = sum(measured_balance) / len(measured_balance) if measured_balance else None
 
     return {
         "total_sessions": len(sessions),
         "total_minutes": total_minutes,
-        "average_performance": round(avg_performance, 2),
-        "average_technique": round(avg_technique, 2),
+        "average_performance": round(avg_performance, 2) if avg_performance is not None else None,
+        "average_technique": round(avg_technique, 2) if avg_technique is not None else None,
         "average_reaction": round(avg_reaction, 2) if avg_reaction is not None else None,
-        "average_balance": round(avg_balance, 2)
+        "average_balance": round(avg_balance, 2) if avg_balance is not None else None
     }

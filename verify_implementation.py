@@ -1,15 +1,22 @@
 #!/usr/bin/env python
+import sys
 import requests
 import json
 import time
+from pathlib import Path
+
+sys.stdout.reconfigure(encoding="utf-8")
+sys.stderr.reconfigure(encoding="utf-8")
 
 BASE_URL = 'http://localhost:8080'
+ROOT = Path(__file__).resolve().parent
 
 print('=== COMPREHENSIVE VERIFICATION TEST ===\n')
 
 # Test 1: Check if backend is running
 print('[TEST 1] Backend Health Check')
 try:
+    response = requests.get(f'{BASE_URL}/health')
     response = requests.get(f'{BASE_URL}/api/auth/me', headers={'Authorization': 'Bearer invalid'})
     print('✅ Backend is running on port 8080\n')
 except Exception as e:
@@ -51,19 +58,21 @@ try:
         'username': coach_data['username'],
         'password': coach_data['password']
     }
-    response = requests.post(f'{BASE_URL}/api/auth/login', json=login_data)
+    response = requests.post(f'{BASE_URL}/api/auth/login', data=login_data)
     if response.status_code == 200:
         login_response = response.json()
         coach_token = login_response.get('access_token')
-        coach_obj = login_response.get('athlete')
         print(f'✅ Login successful')
         print(f'   - Token: {coach_token[:20]}...')
-        print(f'   - Role in response: {coach_obj.get("role")}')
         
         # Test 4: Verify /me endpoint returns coach role
         print()
         print('[TEST 4] /me Endpoint Verification')
         response = requests.get(f'{BASE_URL}/api/auth/me', headers={'Authorization': f'Bearer {coach_token}'})
+        response = requests.get(
+            f'{BASE_URL}/api/auth/me',
+            headers={'Authorization': 'Bearer ' + coach_token},
+        )
         if response.status_code == 200:
             me_data = response.json()
             print(f'✅ /me endpoint working')
@@ -83,9 +92,9 @@ except Exception as e:
 # Test 5: Check admin.html has required content
 print('[TEST 5] Frontend File Verification')
 try:
-    with open('frontend/pages/admin.html', 'r') as f:
+    with open(ROOT / 'frontend/pages/admin.html', 'r', encoding='utf-8') as f:
         admin_content = f.read()
-        if 'Coach Analytics' in admin_content and 'summary-cards' in admin_content:
+        if ('Coach Dashboard' in admin_content or 'Coach Analytics' in admin_content) and 'summary-cards' in admin_content:
             print('✅ admin.html exists with coach dashboard content')
         else:
             print('❌ admin.html missing expected content')
@@ -96,7 +105,7 @@ except Exception as e:
 print()
 print('[TEST 6] Login Form Account Type Selector')
 try:
-    with open('frontend/pages/login.html', 'r') as f:
+    with open(ROOT / 'frontend/pages/login.html', 'r', encoding='utf-8') as f:
         login_content = f.read()
         if 'id="accountType"' in login_content and 'Athlete' in login_content and 'Coach' in login_content:
             print('✅ login.html has account type selector')
@@ -113,7 +122,7 @@ except Exception as e:
 print()
 print('[TEST 7] Auth.js Coach Signup Logic')
 try:
-    with open('frontend/js/auth.js', 'r') as f:
+    with open(ROOT / 'frontend/js/auth.js', 'r', encoding='utf-8') as f:
         auth_content = f.read()
         if 'signup-coach' in auth_content and 'accountType' in auth_content:
             print('✅ auth.js has coach signup endpoint logic')
@@ -130,7 +139,7 @@ except Exception as e:
 print()
 print('[TEST 8] Dashboard Admin Link')
 try:
-    with open('frontend/pages/dashboard.html', 'r') as f:
+    with open(ROOT / 'frontend/pages/dashboard.html', 'r', encoding='utf-8') as f:
         dashboard_content = f.read()
         if 'id="adminLink"' in dashboard_content and 'Coach Analytics' in dashboard_content:
             print('✅ dashboard.html has admin link')
@@ -152,7 +161,7 @@ pages_to_check = [
 ]
 for page in pages_to_check:
     try:
-        with open(page, 'r') as f:
+        with open(ROOT / page, 'r', encoding='utf-8') as f:
             content = f.read()
             if 'id="adminLink"' in content and 'DOMContentLoaded' in content:
                 print(f'✅ {page.split("/")[-1]} has admin link with detection')

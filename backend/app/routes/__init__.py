@@ -7,6 +7,7 @@ from .gamification import router as gamification_router
 from .reports import router as reports_router
 from .notes import router as notes_router
 from .coaches import router as coaches_router
+from .adaptive import router as adaptive_router
 
 __all__ = [
     "auth_router",
@@ -18,4 +19,5 @@ __all__ = [
     "reports_router",
     "notes_router",
     "coaches_router",
+    "adaptive_router",
 ]

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, Date, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from ..database import Base
@@ -21,6 +21,8 @@ class Athlete(Base):
     linked_sports = Column(String, default="", nullable=False)  # comma-separated enabled sports
     skill_level = Column(String, default="beginner")  # beginner / intermediate / advanced
     dominant_hand = Column(String, default="right")  # right / left
+    adaptive_mode_enabled = Column(Boolean, default=False, nullable=False)
+    adaptive_profile = Column(JSON, nullable=True)
     height = Column(Float, nullable=True)  # in cm
     weight = Column(Float, nullable=True)  # in kg
     training_frequency_per_week = Column(Integer, default=0)

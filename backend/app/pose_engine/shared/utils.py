@@ -7,6 +7,7 @@ from .thresholds import (
     BALANCE_NARROW_RATIO,
     BALANCE_WIDE_RATIO,
 )
+from .normalization import normalize_landmarks
 
 
 class PoseUtils:
@@ -52,6 +53,10 @@ class PoseUtils:
     def coverage(landmarks: List[Dict[str, float]], indices: Optional[List[int]] = None) -> float:
         """Aggregate pose-confidence score for a frame - see ConfidenceGate.coverage."""
         return DEFAULT_GATE.coverage(landmarks, indices)
+
+    @staticmethod
+    def normalize_landmarks(landmarks: List[Dict[str, float]]) -> List[Dict[str, float]]:
+        return normalize_landmarks(landmarks)
 
     @staticmethod
     def calculate_angle(a: Dict[str, float], b: Dict[str, float], c: Dict[str, float]) -> float:

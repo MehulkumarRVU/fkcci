@@ -2,6 +2,8 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List, Optional
 
+DEFAULT_SECRET_KEY = "your-secret-key-change-in-production-use-env-variable"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -11,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     SECRET_KEY: str = Field(
-        "your-secret-key-change-in-production-use-env-variable",
+        DEFAULT_SECRET_KEY,
         description="Secret key for signing tokens. Must be changed in production.",
     )
     ALGORITHM: str = Field("HS256")
@@ -52,3 +54,15 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def validate_production_security(config: Settings) -> None:
+    """Reject configuration that would expose a production deployment."""
+    if config.ENV.lower() != "production":
+        return
+
+    if config.SECRET_KEY == DEFAULT_SECRET_KEY or len(config.SECRET_KEY) < 32:
+        raise RuntimeError("Production requires SECRET_KEY with at least 32 characters.")
+
+    if "*" in config.CORS_ALLOWED_ORIGINS:
+        raise RuntimeError("Production requires explicit CORS_ALLOWED_ORIGINS; wildcard CORS is not allowed.")
