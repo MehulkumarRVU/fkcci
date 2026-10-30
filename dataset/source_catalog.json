@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "license_policy": {
+    "default_status": "unverified",
+    "allowed_for_training": [
+      "permissive",
+      "owner_confirmed"
+    ],
+    "blocked_until_verified": [
+      "academic_noncommercial",
+      "unknown",
+      "restricted"
+    ]
+  },
+  "sources": [
+    {
+      "id": "olympic_boxing_punches",
+      "category": "boxing",
+      "url": "https://www.kaggle.com/datasets/piotrstefaskiue/olympic-boxing-punch-classification-video-dataset",
+      "media": ["video"],
+      "annotations": ["punch_action"],
+      "license_status": "unverified",
+      "recommended_use": "candidate movement-classification source; verify license and provenance before acquisition"
+    },
+    {
+      "id": "fine_badminton",
+      "category": "badminton",
+      "url": "https://zenodo.org/records/20292976",
+      "media": ["video"],
+      "annotations": ["temporal_stroke"],
+      "license_status": "academic_noncommercial",
+      "recommended_use": "research evaluation only until commercial-use rights are confirmed"
+    },
+    {
+      "id": "badminton_player_movement",
+      "category": "badminton",
+      "url": "https://data.mendeley.com/datasets/3sp4xntp34/1",
+      "media": ["video"],
+      "annotations": ["movement"],
+      "license_status": "unverified",
+      "recommended_use": "candidate movement source; inspect terms and annotation format"
+    },
+    {
+      "id": "gym_workout_exercises_video",
+      "category": "gym",
+      "url": "https://www.kaggle.com/datasets/philosopher0808/gym-workoutexercises-video",
+      "media": ["video"],
+      "annotations": ["exercise_class"],
+      "license_status": "unverified",
+      "recommended_use": "candidate exercise-recognition source; verify redistribution and training rights"
+    },
+    {
+      "id": "yoga_pose_competition",
+      "category": "stretching",
+      "url": "https://www.kaggle.com/competitions/col341-a3/data",
+      "media": ["image"],
+      "annotations": ["pose_class"],
+      "license_status": "unverified",
+      "recommended_use": "static-pose reference or evaluation; not sufficient for temporal movement coaching"
+    },
+    {
+      "id": "pushups_video",
+      "category": "calisthenics",
+      "url": "https://www.kaggle.com/code/youssefemad004/pushups-data-videopreprocssing-data/input",
+      "media": ["video"],
+      "annotations": ["exercise_class"],
+      "license_status": "unverified",
+      "recommended_use": "candidate exercise source; verify original media rights"
+    },
+    {
+      "id": "safer_activities",
+      "category": "rehabilitation",
+      "url": "https://safer-activities.github.io/",
+      "media": ["video", "skeleton"],
+      "annotations": ["2d_pose", "3d_pose", "activity"],
+      "license_status": "unverified",
+      "recommended_use": "candidate seated and wheelchair activity source; verify consent and use restrictions"
+    },
+    {
+      "id": "ucf101",
+      "category": "general",
+      "url": "https://www.crcv.ucf.edu/research/data-sets/ucf101/",
+      "media": ["video"],
+      "annotations": ["action_class"],
+      "license_status": "unverified",
+      "recommended_use": "general action-recognition pretraining or smoke tests, not sport technique labels"
+    }
+  ]
+}

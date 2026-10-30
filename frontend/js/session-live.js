@@ -194,6 +194,17 @@ async function startCamera() {
     setCameraStatus('Camera active. Pose detection is running.');
 
     poseDetector.setOnResultsCallback(onPoseResults);
+    poseDetector.setOnTrackingStateCallback(({ state, consecutiveMisses }) => {
+        if (state === 'tracking') {
+            setCameraStatus('Camera active. Pose detection and tracking are running.');
+        } else if (state === 'degraded') {
+            setCameraStatus('Pose detected, but landmark visibility is low. Move fully into frame.', true);
+        } else if (state === 'lost') {
+            setCameraStatus(`Pose tracking lost (${consecutiveMisses} frames). Reposition yourself in view.`, true);
+        } else if (state === 'error') {
+            setCameraStatus('Pose detection failed for a camera frame. Check camera performance.', true);
+        }
+    });
 
     if (fpsTimer) {
         clearInterval(fpsTimer);

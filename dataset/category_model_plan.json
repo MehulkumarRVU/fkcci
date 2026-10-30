@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "adaptive_training_is_cross_cutting": true,
+  "categories": {
+    "boxing": {
+      "evaluation_unit": "sport-specific movement sequences",
+      "minimum_evidence": ["labeled_video", "independent_athlete_test_split", "expert_technique_labels"],
+      "status": "blocked_until_movement_labels"
+    },
+    "table_tennis": {
+      "evaluation_unit": "stroke and footwork sequences",
+      "minimum_evidence": ["movement_specific_video", "stroke_labels", "independent_athlete_test_split"],
+      "status": "blocked_insufficient_video"
+    },
+    "gym": {
+      "evaluation_unit": "exercise repetitions and form deviations",
+      "minimum_evidence": ["labeled_repetition_video", "exercise_labels", "expert_form_labels"],
+      "status": "blocked_no_validated_local_sequence_data"
+    },
+    "badminton": {
+      "evaluation_unit": "stroke and footwork sequences",
+      "minimum_evidence": ["labeled_video", "stroke_labels", "independent_athlete_test_split"],
+      "status": "blocked_until_movement_labels"
+    },
+    "stretching": {
+      "evaluation_unit": "stretch movement phases and hold quality",
+      "minimum_evidence": ["temporal_video", "movement_phase_labels", "expert_quality_labels"],
+      "status": "blocked_static_images_only"
+    },
+    "mobility_training": {
+      "evaluation_unit": "mobility repetitions and range-of-motion quality",
+      "minimum_evidence": ["temporal_video", "movement_phase_labels", "expert_quality_labels"],
+      "status": "blocked_static_images_only"
+    },
+    "rehabilitation": {
+      "evaluation_unit": "reviewed movement sequences with safety constraints",
+      "minimum_evidence": ["permitted_consent_data", "clinical_review", "independent_subject_test_split"],
+      "status": "blocked_permission_and_review_required"
+    },
+    "home_workouts": {
+      "evaluation_unit": "exercise repetitions and form deviations",
+      "minimum_evidence": ["labeled_repetition_video", "exercise_labels", "expert_form_labels"],
+      "status": "blocked_no_validated_local_sequence_data"
+    },
+    "calisthenics": {
+      "evaluation_unit": "exercise progressions and repetitions",
+      "minimum_evidence": ["labeled_repetition_video", "progression_labels", "independent_athlete_test_split"],
+      "status": "blocked_no_validated_local_sequence_data"
+    }
+  },
+  "integration_policy": "A category may be integrated only after its own independent test accuracy and macro-F1 meet the configured threshold. Adaptive Training remains an optional mode within categories and is never counted as a tenth category."
+}

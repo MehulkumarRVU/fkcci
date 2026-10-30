@@ -12,6 +12,10 @@ class PoseDetector {
         this.canvasCtx = null;
         this.lastFrameTime = Date.now();
         this.fps = 0;
+        this.frameInFlight = false;
+        this.trackingState = 'initializing';
+        this.trackingMisses = 0;
+        this.trackingCallback = null;
         // Opt-in background segmentation ("subject isolation") - off by
         // default since it's WASM-heavy and changes the whole visual.
         this.isolateSubject = false;
@@ -76,6 +80,9 @@ class PoseDetector {
             this.canvasElement.height = this.videoElement.videoHeight;
 
             this.isRunning = true;
+            this.trackingState = 'searching';
+            this.trackingMisses = 0;
+            this.emitTrackingState();
             this.detectFrame();
             
             console.log('Camera started');
@@ -96,6 +103,10 @@ class PoseDetector {
 
     stopCamera() {
         this.isRunning = false;
+        this.frameInFlight = false;
+        this.trackingState = 'stopped';
+        this.trackingMisses = 0;
+        this.emitTrackingState();
 
         if (this.videoElement && this.videoElement.srcObject) {
             const tracks = this.videoElement.srcObject.getTracks();
@@ -114,8 +125,17 @@ class PoseDetector {
     async detectFrame() {
         if (!this.isRunning) return;
 
-        if (this.videoElement.readyState === this.videoElement.HAVE_ENOUGH_DATA) {
-            await this.pose.send({ image: this.videoElement });
+        if (!this.frameInFlight && this.videoElement.readyState === this.videoElement.HAVE_ENOUGH_DATA) {
+            this.frameInFlight = true;
+            try {
+                await this.pose.send({ image: this.videoElement });
+            } catch (error) {
+                console.error('Pose detection failed for video frame:', error);
+                this.trackingState = 'error';
+                this.emitTrackingState();
+            } finally {
+                this.frameInFlight = false;
+            }
         }
 
         requestAnimationFrame(() => this.detectFrame());
@@ -137,6 +157,16 @@ class PoseDetector {
         if (this.isolateSubject && results.segmentationMask) {
             this.drawSubjectIsolation(results);
         }
+
+        if (results.poseLandmarks) {
+            const quality = this.getLandmarkQuality(results.poseLandmarks);
+            this.trackingMisses = quality.reliable ? 0 : this.trackingMisses + 1;
+            this.trackingState = quality.reliable ? 'tracking' : 'degraded';
+        } else {
+            this.trackingMisses += 1;
+            this.trackingState = this.trackingMisses >= 3 ? 'lost' : 'searching';
+        }
+        this.emitTrackingState();
 
         // Draw pose landmarks if detected
         if (results.poseLandmarks) {
@@ -226,6 +256,27 @@ class PoseDetector {
 
     setOnResultsCallback(callback) {
         this.onResultsCallback = callback;
+    }
+
+    setOnTrackingStateCallback(callback) {
+        this.trackingCallback = callback;
+        this.emitTrackingState();
+    }
+
+    emitTrackingState() {
+        if (this.trackingCallback) {
+            this.trackingCallback({
+                state: this.trackingState,
+                consecutiveMisses: this.trackingMisses
+            });
+        }
+    }
+
+    getTrackingState() {
+        return {
+            state: this.trackingState,
+            consecutiveMisses: this.trackingMisses
+        };
     }
 
     getFPS() {
