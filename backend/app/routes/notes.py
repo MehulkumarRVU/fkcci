@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -18,6 +18,8 @@ class NoteCreate(BaseModel):
 
 
 class NoteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     athlete_id: int
     author_id: int
@@ -26,10 +28,6 @@ class NoteOut(BaseModel):
     session_id: Optional[int]
     message: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
-
 
 def _check_thread_access(athlete_id: int, current_athlete: Athlete, db: Session) -> Athlete:
     """A thread is scoped to one athlete; only that athlete or their
@@ -48,7 +46,7 @@ def _check_thread_access(athlete_id: int, current_athlete: Athlete, db: Session)
 
 
 @router.get("/athlete/{athlete_id}", response_model=List[NoteOut])
-async def get_notes(
+def get_notes(
     athlete_id: int,
     session_id: Optional[int] = None,
     current_athlete: Athlete = Depends(get_current_athlete),
@@ -80,7 +78,7 @@ async def get_notes(
 
 
 @router.post("/athlete/{athlete_id}", response_model=NoteOut, status_code=status.HTTP_201_CREATED)
-async def post_note(
+def post_note(
     athlete_id: int,
     note: NoteCreate,
     current_athlete: Athlete = Depends(get_current_athlete),

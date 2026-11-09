@@ -1,6 +1,6 @@
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT not in sys.path:
@@ -51,7 +51,7 @@ def test_coach_analytics_endpoints(app, client, db_session):
     db_session.refresh(athlete_one)
     db_session.refresh(athlete_two)
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     sessions = [
         Session(
             athlete_id=athlete_one.id,

@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, JSON, Text, DateTime, ForeignKey
-from datetime import datetime
 from ..database import Base
+from ..time_utils import utc_now
 
 
 class SkillReferencePose(Base):
@@ -21,4 +21,4 @@ class SkillReferencePose(Base):
     checkpoint_name = Column(String, nullable=False, default="default")
     joint_angle_ranges = Column(JSON, nullable=False)  # e.g. {"arm_extension": [130, 170]}
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now)

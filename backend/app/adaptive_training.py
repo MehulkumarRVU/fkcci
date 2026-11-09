@@ -115,6 +115,11 @@ def exercise_catalog(category: Optional[str] = None) -> Dict[str, Dict[str, Any]
     }
 
 
+def is_exercise_supported(category: str, exercise: str) -> bool:
+    exercise_details = EXERCISES.get(exercise)
+    return bool(exercise_details and category in exercise_details["categories"])
+
+
 def required_landmarks(exercise: str) -> List[int]:
     return list(EXERCISES[exercise]["required_landmarks"])
 

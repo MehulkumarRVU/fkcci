@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from ..time_utils import utc_now
 from ..database import Base
 
 
@@ -15,7 +15,7 @@ class Session(Base):
     session_type = Column(String, nullable=False)  # drill / sparring / shadow / match_simulation
     
     # Timing
-    start_time = Column(DateTime, default=datetime.utcnow)
+    start_time = Column(DateTime(timezone=True), default=utc_now)
     end_time = Column(DateTime, nullable=True)
     duration_minutes = Column(Integer, default=0)
     is_completed = Column(Boolean, default=False)
@@ -48,7 +48,7 @@ class Session(Base):
     adaptive_exercise = Column(String, nullable=True)
     adaptive_reference = Column(JSON, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
     
     # Relationships
     athlete = relationship("Athlete", back_populates="sessions")

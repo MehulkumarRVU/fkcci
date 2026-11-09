@@ -167,7 +167,7 @@ Navigate to: http://localhost:8080/docs
 ### Authentication
 - ✅ User registration with email validation
 - ✅ Secure password hashing (bcrypt)
-- ✅ JWT token generation (7-day expiry)
+- ✅ JWT token generation (15-minute access expiry) with rotating refresh tokens
 - ✅ Token refresh mechanism
 - ✅ Protected API endpoints
 
@@ -331,7 +331,7 @@ boxing/
 - ✅ Password hashing with bcrypt
 - ✅ Email validation
 - ✅ CORS protection
-- ✅ Token expiration (7 days)
+- ✅ 15-minute access-token expiration with rotating refresh tokens
 - ✅ Protected endpoints
 - ✅ User isolation (can only access own data)
 

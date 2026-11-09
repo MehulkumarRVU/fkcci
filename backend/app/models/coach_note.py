@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
-from datetime import datetime
 from ..database import Base
+from ..time_utils import utc_now
 
 
 class CoachNote(Base):
@@ -16,4 +16,4 @@ class CoachNote(Base):
     author_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
     session_id = Column(Integer, ForeignKey("sessions.id"), nullable=True)
     message = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now)

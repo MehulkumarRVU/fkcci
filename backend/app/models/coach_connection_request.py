@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from datetime import datetime
 from ..database import Base
+from ..time_utils import utc_now
 
 
 class CoachConnectionRequest(Base):
@@ -14,5 +14,5 @@ class CoachConnectionRequest(Base):
     athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
     coach_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
     status = Column(String, default="pending")  # pending / accepted / rejected
-    created_at = Column(DateTime, default=datetime.utcnow)
-    responded_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    responded_at = Column(DateTime(timezone=True), nullable=True)

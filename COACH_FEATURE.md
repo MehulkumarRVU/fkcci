@@ -228,7 +228,7 @@ Frontend:
 - Authentication required for all endpoints
 - Coach can only view athletes they coach
 - Role-based access control enforced on endpoints
-- JWT tokens have 7-day expiration
+- Access JWTs expire after 15 minutes; refresh tokens rotate on renewal
 - Passwords hashed with PBKDF2-SHA256
 
 ## Performance Notes

@@ -182,9 +182,30 @@
                             <option value="seated">Seated</option>
                             <option value="wheelchair">Wheelchair-based</option>
                         </select>
+                        <label class="form-label" for="adaptiveExercise">Adaptive exercise focus</label>
+                        <select id="adaptiveExercise" class="form-select">
+                            <option value="">No exercise selected</option>
+                        </select>
+                        <label class="form-label" for="adaptiveCamera">Preferred camera orientation</label>
+                        <select id="adaptiveCamera" class="form-select">
+                            <option value="">Choose during each session</option>
+                            <option value="front">Front</option>
+                            <option value="side">Side</option>
+                        </select>
+                        <label class="form-label" for="adaptiveGoals">Training goals</label>
+                        <select id="adaptiveGoals" class="form-select" multiple size="4" aria-describedby="adaptiveGoalsHelp">
+                            <option value="movement_consistency">Movement consistency</option>
+                            <option value="range_of_motion">Range of motion</option>
+                            <option value="balance_and_control">Balance and control</option>
+                            <option value="technique_confidence">Technique confidence</option>
+                        </select>
+                        <small id="adaptiveGoalsHelp" style="color: var(--text-secondary);">Select any goals that matter to you. Use Ctrl (Windows) or Command (Mac) to select more than one.</small>
+                        <label class="form-label" for="adaptiveEquipment">Equipment or support to account for</label>
+                        <input id="adaptiveEquipment" class="form-input" placeholder="Optional, comma-separated">
                         <label class="form-label" for="adaptivePreferences">Accessibility preferences</label>
                         <input id="adaptivePreferences" class="form-input" placeholder="Optional, comma-separated preferences">
                         <p id="adaptiveCapabilities" role="status" style="color: var(--text-secondary);"></p>
+                        <p style="color: var(--text-secondary);">Adaptive movement guidance is a training aid, not a medical assessment.</p>
                     </div>
                     <button type="submit" class="btn btn-primary">Save Adaptive Settings</button>
                     <button type="button" id="cancelAdaptiveProfile" class="btn btn-outline">Cancel</button>
@@ -240,7 +261,7 @@
         </div>
     </div>
 
-    <script src="../js/auth-utils.js?v=4"></script>
+    <script src="../js/auth-utils.js?v=6"></script>
     <script>
         // Show admin link for coaches
         document.addEventListener('DOMContentLoaded', function() {
@@ -267,6 +288,6 @@
             }
         });
     </script>
-    <script src="../js/profile.js?v=4"></script>
+    <script src="../js/profile.js?v=5"></script>
 </body>
 </html>

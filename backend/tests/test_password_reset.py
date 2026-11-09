@@ -1,6 +1,6 @@
 import sys
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -13,6 +13,7 @@ from app.database import SessionLocal
 from app.models.athlete import Athlete
 from app.models.password_reset_token import PasswordResetToken
 from app.services.auth_service import AuthService
+from app.services.email_service import send_password_reset_email
 
 client = TestClient(app)
 
@@ -56,6 +57,14 @@ def test_request_survives_smtp_failure_without_500():
     assert "sent" in resp.json()["message"].lower()
 
 
+def test_unconfigured_smtp_does_not_log_password_reset_link(caplog):
+    with patch("app.services.email_service.settings.SMTP_HOST", None):
+        send_password_reset_email("private@example.com", "https://example.test/reset?token=secret-token")
+
+    assert "secret-token" not in caplog.text
+    assert "private@example.com" not in caplog.text
+
+
 def test_request_returns_same_generic_message_for_unknown_email():
     resp = client.post("/api/auth/password-reset/request", json={"email": "definitely_not_registered@example.com"})
     assert resp.status_code == 200
@@ -95,7 +104,7 @@ def test_expired_token_rejected():
 
     with SessionLocal() as db:
         prt = db.query(PasswordResetToken).filter(PasswordResetToken.athlete_id == athlete_id).first()
-        prt.expires_at = datetime.utcnow() - timedelta(minutes=1)
+        prt.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
         db.commit()
 
     resp = client.post("/api/auth/password-reset/confirm", json={"token": token, "new_password": "newpassexp123"})

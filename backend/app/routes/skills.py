@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -27,6 +27,8 @@ class SkillCreate(BaseModel):
 
 
 class SkillResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     sport_type: str
@@ -38,13 +40,9 @@ class SkillResponse(BaseModel):
     primary_focus: Optional[str]
     is_active: bool
 
-    class Config:
-        from_attributes = True
-
-
 # Routes
 @router.get("/", response_model=List[SkillResponse])
-async def get_skills(
+def get_skills(
     sport_type: Optional[str] = Query(None, description="Filter by sport type"),
     difficulty_level: Optional[str] = Query(None, description="Filter by difficulty"),
     db: Session = Depends(get_db)
@@ -63,7 +61,7 @@ async def get_skills(
 
 
 @router.get("/{skill_id}", response_model=SkillResponse)
-async def get_skill(skill_id: int, db: Session = Depends(get_db)):
+def get_skill(skill_id: int, db: Session = Depends(get_db)):
     """Get a specific skill by ID"""
     skill = db.query(Skill).filter(Skill.id == skill_id, Skill.is_active == True).first()
     
@@ -77,7 +75,7 @@ async def get_skill(skill_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{skill_id}/reference-pose")
-async def get_skill_reference_pose(
+def get_skill_reference_pose(
     skill_id: int,
     skill_level: str = Query("beginner", description="beginner / intermediate / advanced"),
     db: Session = Depends(get_db)
@@ -104,7 +102,7 @@ async def get_skill_reference_pose(
 
 
 @router.post("/", response_model=SkillResponse, status_code=status.HTTP_201_CREATED)
-async def create_skill(
+def create_skill(
     skill_data: SkillCreate,
     db: Session = Depends(get_db),
     current_user = Depends(require_role("coach", "admin")),
@@ -127,7 +125,7 @@ async def create_skill(
             detail="Invalid sport_type"
         )
     
-    new_skill = Skill(**skill_data.dict())
+    new_skill = Skill(**skill_data.model_dump())
     db.add(new_skill)
     db.commit()
     db.refresh(new_skill)
@@ -136,7 +134,7 @@ async def create_skill(
 
 
 @router.post("/seed")
-async def seed_skills(
+def seed_skills(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
 ):

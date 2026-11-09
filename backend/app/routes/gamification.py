@@ -29,7 +29,7 @@ class GamificationSummary(BaseModel):
 
 
 @router.get("/me", response_model=GamificationSummary)
-async def get_my_gamification(
+def get_my_gamification(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db)
 ):

@@ -3,6 +3,7 @@ from app.adaptive_training import (
     AdaptiveProfileInput,
     evaluate_adaptive_frame,
     exercise_catalog,
+    is_exercise_supported,
 )
 
 
@@ -19,6 +20,12 @@ def test_adaptive_catalog_exposes_supported_setups_without_new_category():
     exercise = exercise_catalog("table_tennis")["adaptive_racket_arm"]
     assert exercise["setups"] == ["standing", "seated", "wheelchair"]
     assert "required_landmarks" in exercise
+
+
+def test_adaptive_exercise_support_is_category_specific():
+    assert is_exercise_supported("boxing", "adaptive_punch")
+    assert not is_exercise_supported("calisthenics", "adaptive_punch")
+    assert not exercise_catalog("calisthenics")
 
 
 def test_seated_adaptive_analysis_uses_partial_upper_body_requirements():

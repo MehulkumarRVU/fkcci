@@ -1,11 +1,25 @@
-import time
 import asyncio
+import logging
+import time
+import inspect
 from typing import Dict, Optional
-from starlette.types import ASGIApp, Receive, Scope, Send
+
+from redis.exceptions import RedisError
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from ..config import settings
+
+logger = logging.getLogger(__name__)
+
+_INCREMENT_WITH_EXPIRY = """
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+"""
 
 
 class InMemoryBucket:
@@ -15,17 +29,14 @@ class InMemoryBucket:
         self.hits: Dict[str, list[float]] = {}
         self.lock = asyncio.Lock()
 
-    async def hit(self, key: str) -> (bool, int):
+    async def hit(self, key: str) -> tuple[bool, int]:
         now = time.time()
         async with self.lock:
-            arr = self.hits.get(key, [])
-            # remove old timestamps
-            arr = [t for t in arr if t > now - self.window]
-            arr.append(now)
-            self.hits[key] = arr
-            remaining = max(0, self.max - len(arr))
-            allowed = len(arr) <= self.max
-            return allowed, remaining
+            timestamps = [timestamp for timestamp in self.hits.get(key, []) if timestamp > now - self.window]
+            timestamps.append(now)
+            self.hits[key] = timestamps
+            remaining = max(0, self.max - len(timestamps))
+            return len(timestamps) <= self.max, remaining
 
 
 class RedisBucket:
@@ -34,14 +45,10 @@ class RedisBucket:
         self.max = max_requests
         self.window = window
 
-    async def hit(self, key: str) -> (bool, int):
-        # Uses INCR and EXPIRE to count requests in window
-        count = await self.redis.incr(key)
-        if count == 1:
-            await self.redis.expire(key, self.window)
+    async def hit(self, key: str) -> tuple[bool, int]:
+        count = await self.redis.eval(_INCREMENT_WITH_EXPIRY, 1, key, self.window)
         allowed = count <= self.max
-        remaining = max(0, self.max - count)
-        return allowed, remaining
+        return allowed, max(0, self.max - count)
 
 
 class RateLimitMiddleware:
@@ -50,59 +57,102 @@ class RateLimitMiddleware:
         self.requests = settings.RATE_LIMIT_REQUESTS
         self.window = settings.RATE_LIMIT_WINDOW_SECONDS
         self.redis_url = settings.REDIS_URL
-        self.bucket: Optional[object] = None
-        self._init_bucket_sync()
+        self.connect_timeout = settings.REDIS_CONNECT_TIMEOUT_SECONDS
+        self.retry_interval = settings.REDIS_RETRY_INTERVAL_SECONDS
+        self.bucket: InMemoryBucket | RedisBucket = InMemoryBucket(self.requests, self.window)
+        self.redis_client = None
+        self._redis_retry_after = 0.0
+        self._redis_lock = asyncio.Lock()
+        self._key_prefix = f"{settings.RATE_LIMIT_KEY_PREFIX}:"
 
-    def _init_bucket_sync(self):
-        # Attempt to initialize Redis bucket if REDIS_URL available and redis is installed.
-        if self.redis_url:
+    async def _close_redis(self) -> None:
+        client, self.redis_client = self.redis_client, None
+        if client is None:
+            return
+        close = getattr(client, "aclose", None) or getattr(client, "close", None)
+        if close:
+            result = close()
+            if inspect.isawaitable(result):
+                await result
+
+    async def _get_bucket(self) -> InMemoryBucket | RedisBucket:
+        if isinstance(self.bucket, RedisBucket) or not self.redis_url:
+            return self.bucket
+
+        if time.monotonic() < self._redis_retry_after:
+            return self.bucket
+
+        async with self._redis_lock:
+            if isinstance(self.bucket, RedisBucket):
+                return self.bucket
+            if time.monotonic() < self._redis_retry_after:
+                return self.bucket
+            client = None
+            connected = False
             try:
                 import redis.asyncio as aioredis
 
-                redis_client = aioredis.from_url(self.redis_url)
-                ping = redis_client.ping()
-                loop = None
-                try:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    loop.run_until_complete(ping)
-                    self.bucket = RedisBucket(redis_client, self.requests, self.window)
-                    return
-                except Exception:
-                    ping.close()
-                finally:
-                    if loop is not None:
-                        loop.close()
+                client = aioredis.from_url(
+                    self.redis_url,
+                    socket_connect_timeout=self.connect_timeout,
+                    socket_timeout=self.connect_timeout,
+                )
+                self.redis_client = client
+                await client.ping()
+                connected = True
+            except ImportError:
+                logger.warning("Redis package is unavailable; using in-memory rate limiting")
+            except (RedisError, OSError, TimeoutError):
+                logger.warning("Redis is unavailable; using in-memory rate limiting")
+                if client is not None:
                     try:
-                        asyncio.set_event_loop(None)
-                    except RuntimeError:
-                        pass
-            except Exception:
-                pass
+                        await self._close_redis()
+                    except RedisError:
+                        logger.warning("Failed to close unavailable Redis connection")
+            if connected and client is not None:
+                self.bucket = RedisBucket(client, self.requests, self.window)
+                logger.info("Redis-backed rate limiting is active")
+                return self.bucket
+            self.redis_client = None
+            self._redis_retry_after = time.monotonic() + self.retry_interval
+            return self.bucket
 
-        # Default fallback to local in-memory rate limiter.
-        self.bucket = InMemoryBucket(self.requests, self.window)
+    async def _hit(self, key: str) -> tuple[bool, int]:
+        bucket = await self._get_bucket()
+        if isinstance(bucket, RedisBucket):
+            try:
+                return await bucket.hit(key)
+            except RedisError:
+                logger.warning("Redis rate limiting failed; falling back to in-memory rate limiting", exc_info=True)
+                await self._close_redis()
+                self.bucket = InMemoryBucket(self.requests, self.window)
+                self._redis_retry_after = time.monotonic() + self.retry_interval
+                return await self.bucket.hit(key)
+        return await bucket.hit(key)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "lifespan":
+            async def close_on_shutdown(message):
+                await send(message)
+                if message["type"] == "lifespan.shutdown.complete":
+                    await self._close_redis()
+
+            await self.app(scope, receive, close_on_shutdown)
+            return
+
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
         request = Request(scope, receive=receive)
-        # identify client by IP or Authorization header
         ip = request.client.host if request.client else "unknown"
-        key = f"rl:{ip}"
-
-        # If Redis bucket, ensure redis client is connected
-        if isinstance(self.bucket, RedisBucket):
-            allowed, remaining = await self.bucket.hit(key)
-        else:
-            allowed, remaining = await self.bucket.hit(key)
-
+        allowed, _ = await self._hit(f"{self._key_prefix}{ip}")
         if not allowed:
-            body = {"detail": "Rate limit exceeded"}
-            headers = {"Retry-After": str(self.window)}
-            response = JSONResponse(body, status_code=429, headers=headers)
+            response = JSONResponse(
+                {"detail": "Rate limit exceeded"},
+                status_code=429,
+                headers={"Retry-After": str(self.window)},
+            )
             await response(scope, receive, send)
             return
 

@@ -22,7 +22,7 @@ def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
 
 
 @router.get("/session/{session_id}/pdf")
-async def download_session_report(
+def download_session_report(
     session_id: int,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
@@ -39,7 +39,7 @@ async def download_session_report(
 
 
 @router.get("/progress/pdf")
-async def download_progress_report(
+def download_progress_report(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
 ):
@@ -47,14 +47,14 @@ async def download_progress_report(
     profile-twin aggregation and session-stats summary already used
     elsewhere - no new aggregation logic."""
     twin_data = get_athlete_twin(current_athlete.id, db)
-    stats = await get_session_stats(current_athlete=current_athlete, db=db)
+    stats = get_session_stats(current_athlete=current_athlete, db=db)
 
     pdf_bytes = build_progress_report(current_athlete, twin_data, stats)
     return _pdf_response(pdf_bytes, f"{current_athlete.username}_progress_report.pdf")
 
 
 @router.get("/coach/athlete/{athlete_id}/pdf")
-async def download_coach_athlete_report(
+def download_coach_athlete_report(
     athlete_id: int,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),

@@ -32,6 +32,11 @@ images, videos, and annotation files; an image count is not a pose-sequence
 count and does not establish training suitability. No model is trained or
 loaded by this audit.
 
+The latest non-hashing inventory run found 29,814 images, no videos, and 3
+annotation-extension files across 39 category folders. Duplicate detection
+was not enabled, and the extension-based annotation count does not establish
+that these files contain usable pose labels.
+
 ## Pose extraction, training, and tracking verification
 
 The compatible Python MediaPipe range is pinned in

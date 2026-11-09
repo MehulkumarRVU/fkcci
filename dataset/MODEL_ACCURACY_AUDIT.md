@@ -25,6 +25,15 @@ independent test result.
 
 ## Reproducible comparison
 
+The latest checked-in comparison report evaluated 3,474 usable image samples
+(2,077 train / 676 validation / 721 test) from 5,093 files seen. Its selected
+gradient-boosting classifier achieved 68.93% test accuracy and 60.65% test
+macro-F1. Table Tennis test F1 was 36.17%. The result is below the project's
+90% accuracy and macro-F1 integration gate, and the task remains broad
+single-image sport-folder classification, not coaching or temporal movement
+recognition. The data inventory and model report do not establish licensing or
+athlete/video-level independence.
+
 Run:
 
 ```powershell

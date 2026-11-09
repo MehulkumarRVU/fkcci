@@ -437,7 +437,7 @@ curl -H "Authorization: Bearer YOUR_TOKEN_HERE" \
 
 ## 🔐 Security Notes
 
-- **JWT Token:** 7-day expiration
+- **JWT access token:** 15-minute expiration; refresh tokens rotate on renewal
 - **Password:** Hashed with bcrypt
 - **Database:** SQLite (no external dependencies)
 - **CORS:** Public access for development
@@ -450,7 +450,7 @@ Create a `.env` file in the project root or set environment variables in your de
 ```
 SECRET_KEY=your-very-long-random-secret
 ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_DAYS=7
+ACCESS_TOKEN_EXPIRE_MINUTES=15
 DATABASE_URL=sqlite:///./pocketcoach.db
 ```
 

@@ -5,7 +5,12 @@ from ..models.athlete import Athlete
 from ..services.analysis_service import AnalysisService
 from ..pose_engine.analyzer_factory import UnregisteredSportError
 from .auth import get_current_athlete
-from ..adaptive_training import AdaptiveAnalysisConfig, ACTIVE_ADAPTIVE_CATEGORIES, evaluate_adaptive_frame
+from ..adaptive_training import (
+    AdaptiveAnalysisConfig,
+    ACTIVE_ADAPTIVE_CATEGORIES,
+    evaluate_adaptive_frame,
+    is_exercise_supported,
+)
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 
@@ -81,7 +86,7 @@ def _validate_skill(analyzer, skill_name: str):
 
 
 @router.post("/analyze", response_model=AnalysisResponse)
-async def analyze_technique(
+def analyze_technique(
     request: AnalysisRequest,
     current_athlete: Athlete = Depends(get_current_athlete)
 ):
@@ -98,6 +103,8 @@ async def analyze_technique(
     if request.adaptive:
         if request.sport_type not in ACTIVE_ADAPTIVE_CATEGORIES:
             raise HTTPException(status_code=400, detail="Adaptive training is unavailable for this category")
+        if not is_exercise_supported(request.sport_type, request.adaptive.exercise):
+            raise HTTPException(status_code=400, detail="Adaptive exercise is unavailable for this category")
         adaptive_results = [
             evaluate_adaptive_frame(pose.landmarks, request.adaptive)
             for pose in request.pose_data
@@ -226,7 +233,7 @@ async def analyze_technique(
 
 
 @router.post("/realtime-feedback")
-async def get_realtime_feedback(
+def get_realtime_feedback(
     request: RealtimeFeedbackRequest,
     current_athlete: Athlete = Depends(get_current_athlete)
 ):
@@ -238,6 +245,8 @@ async def get_realtime_feedback(
     if request.adaptive:
         if request.sport_type not in ACTIVE_ADAPTIVE_CATEGORIES:
             raise HTTPException(status_code=400, detail="Adaptive training is unavailable for this category")
+        if not is_exercise_supported(request.sport_type, request.adaptive.exercise):
+            raise HTTPException(status_code=400, detail="Adaptive exercise is unavailable for this category")
         return evaluate_adaptive_frame(request.landmarks, request.adaptive)
 
     skill_level, dominant_hand = _athlete_context(current_athlete)

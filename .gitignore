@@ -61,4 +61,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 temp/
+backups/
 .claude/

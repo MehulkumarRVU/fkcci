@@ -106,3 +106,55 @@ def test_analysis_api_rejects_unknown_skill():
         assert response.json()["detail"]["supported_skills"]
     finally:
         app.dependency_overrides.pop(get_current_athlete, None)
+
+
+def test_adaptive_realtime_feedback_rejects_exercise_for_wrong_category():
+    class DummyUser:
+        username = "testuser"
+        id = 1
+
+    from app.routes.auth import get_current_athlete
+
+    app.dependency_overrides[get_current_athlete] = lambda: DummyUser()
+    client = TestClient(app)
+    try:
+        response = client.post("/api/analysis/realtime-feedback", json={
+            "sport_type": "calisthenics",
+            "skill_name": "Basic Calisthenics Technique",
+            "landmarks": make_simple_landmarks(),
+            "adaptive": {
+                "setup": "standing",
+                "exercise": "adaptive_punch",
+                "camera_view": "front",
+            },
+        })
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Adaptive exercise is unavailable for this category"
+    finally:
+        app.dependency_overrides.pop(get_current_athlete, None)
+
+
+def test_adaptive_session_analysis_rejects_exercise_for_wrong_category():
+    class DummyUser:
+        username = "testuser"
+        id = 1
+
+    from app.routes.auth import get_current_athlete
+
+    app.dependency_overrides[get_current_athlete] = lambda: DummyUser()
+    client = TestClient(app)
+    try:
+        response = client.post("/api/analysis/analyze", json={
+            "sport_type": "calisthenics",
+            "skill_name": "Basic Calisthenics Technique",
+            "pose_data": [{"landmarks": make_simple_landmarks(), "timestamp": 0.0}],
+            "adaptive": {
+                "setup": "standing",
+                "exercise": "adaptive_punch",
+                "camera_view": "front",
+            },
+        })
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Adaptive exercise is unavailable for this category"
+    finally:
+        app.dependency_overrides.pop(get_current_athlete, None)

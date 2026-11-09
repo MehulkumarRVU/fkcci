@@ -121,15 +121,40 @@
                         <label style="margin-left: 1rem;"><input type="radio" name="signupTrainingMode" value="adaptive"> Adaptive Training</label>
                     </fieldset>
                     <div id="signupAdaptiveOptions" class="form-group hidden" aria-live="polite">
+                        <h3>Personalize your adaptive training</h3>
+                        <p style="color: var(--text-secondary);">
+                            Choose the setup and learning goals that work for you. These preferences tailor
+                            available movement guidance and can be changed later.
+                        </p>
                         <label class="form-label" for="signupAdaptiveSetup">Preferred training setup</label>
                         <select id="signupAdaptiveSetup" class="form-select">
                             <option value="standing">Standing</option>
                             <option value="seated">Seated</option>
                             <option value="wheelchair">Wheelchair-based</option>
                         </select>
+                        <label class="form-label" for="signupAdaptiveExercise">Adaptive exercise focus</label>
+                        <select id="signupAdaptiveExercise" class="form-select">
+                            <option value="">Choose a training category first</option>
+                        </select>
+                        <label class="form-label" for="signupAdaptiveCamera">Preferred camera orientation</label>
+                        <select id="signupAdaptiveCamera" class="form-select">
+                            <option value="">Choose during each session</option>
+                            <option value="front">Front</option>
+                            <option value="side">Side</option>
+                        </select>
+                        <label class="form-label" for="signupAdaptiveGoals">Training goals</label>
+                        <select id="signupAdaptiveGoals" class="form-select" multiple size="4" aria-describedby="signupAdaptiveGoalsHelp">
+                            <option value="movement_consistency">Movement consistency</option>
+                            <option value="range_of_motion">Range of motion</option>
+                            <option value="balance_and_control">Balance and control</option>
+                            <option value="technique_confidence">Technique confidence</option>
+                        </select>
+                        <small id="signupAdaptiveGoalsHelp" style="color: var(--text-secondary);">Select any goals that matter to you. Use Ctrl (Windows) or Command (Mac) to select more than one.</small>
+                        <label class="form-label" for="signupAdaptiveEquipment">Equipment or support to account for</label>
+                        <input id="signupAdaptiveEquipment" class="form-input" placeholder="Optional, comma-separated">
                         <label class="form-label" for="signupAdaptivePreferences">Accessibility preferences</label>
                         <input id="signupAdaptivePreferences" class="form-input" placeholder="Optional, comma-separated preferences">
-                        <p role="status" style="color: var(--text-secondary);">You can change or remove these settings later. No diagnosis or disability information is required.</p>
+                        <p role="status" style="color: var(--text-secondary);">You can change or remove these settings later. No diagnosis or disability information is required. Adaptive movement guidance is a training aid, not a medical assessment.</p>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%;">Create Account</button>
@@ -146,7 +171,7 @@
         </div>
     </div>
 
-    <script src="../js/auth-utils.js?v=4"></script>
-    <script src="../js/auth.js?v=4"></script>
+    <script src="../js/auth-utils.js?v=6"></script>
+    <script src="../js/auth.js?v=6"></script>
 </body>
 </html>

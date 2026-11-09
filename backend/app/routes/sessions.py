@@ -1,15 +1,20 @@
 from typing import List, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models.session import Session as SessionModel
 from ..models.athlete import Athlete
 from ..services.gamification_service import update_streak, check_and_award_achievements
-from ..adaptive_training import AdaptiveAnalysisConfig, ACTIVE_ADAPTIVE_CATEGORIES
+from ..adaptive_training import (
+    AdaptiveAnalysisConfig,
+    ACTIVE_ADAPTIVE_CATEGORIES,
+    is_exercise_supported,
+)
 from .auth import get_current_athlete
+from ..time_utils import utc_now
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 
@@ -42,6 +47,8 @@ class SessionUpdate(BaseModel):
 
 
 class SessionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     athlete_id: int
     sport_type: str
@@ -64,13 +71,9 @@ class SessionResponse(BaseModel):
     adaptive_reference: Optional[dict] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
 # Routes
 @router.post("/", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
-async def create_session(
+def create_session(
     session_data: SessionCreate,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db)
@@ -86,6 +89,10 @@ async def create_session(
         )
     if session_data.adaptive and session_data.sport_type not in ACTIVE_ADAPTIVE_CATEGORIES:
         raise HTTPException(status_code=400, detail="Adaptive training is unavailable for this category")
+    if session_data.adaptive and not is_exercise_supported(
+        session_data.sport_type, session_data.adaptive.exercise
+    ):
+        raise HTTPException(status_code=400, detail="Adaptive exercise is unavailable for this category")
     
     # Validate session type
     valid_session_types = ["drill", "sparring", "shadow", "match_simulation"]
@@ -98,7 +105,7 @@ async def create_session(
     # Free tier: capped at FREE_TIER_SESSIONS_PER_30_DAYS sessions in a
     # rolling 30-day window. Pro tier is unlimited.
     if current_athlete.membership_tier != "pro":
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        thirty_days_ago = utc_now() - timedelta(days=30)
         recent_session_count = (
             db.query(SessionModel)
             .filter(SessionModel.athlete_id == current_athlete.id, SessionModel.start_time >= thirty_days_ago)
@@ -136,7 +143,7 @@ async def create_session(
 
 
 @router.get("/", response_model=List[SessionResponse])
-async def get_athlete_sessions(
+def get_athlete_sessions(
     skip: int = 0,
     limit: int = 50,
     current_athlete: Athlete = Depends(get_current_athlete),
@@ -155,7 +162,7 @@ async def get_athlete_sessions(
 
 
 @router.get("/{session_id}", response_model=SessionResponse)
-async def get_session(
+def get_session(
     session_id: int,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db)
@@ -180,7 +187,7 @@ async def get_session(
 
 
 @router.put("/{session_id}", response_model=SessionResponse)
-async def update_session(
+def update_session(
     session_id: int,
     session_update: SessionUpdate,
     current_athlete: Athlete = Depends(get_current_athlete),
@@ -210,7 +217,7 @@ async def update_session(
     was_already_completed = session.is_completed
 
     # Update fields
-    update_data = session_update.dict(exclude_unset=True)
+    update_data = session_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(session, key, value)
 
@@ -227,12 +234,12 @@ async def update_session(
                  (session_update.performance_score or 0)) / current_athlete.total_sessions
             )
         
-        current_athlete.updated_at = datetime.utcnow()
+        current_athlete.updated_at = utc_now()
 
         # Gamification: streak + achievements update on the same
         # is_completed transition total_sessions/performance_rating already
         # use, so this fires exactly once per real completion.
-        session_day = (session.start_time or datetime.utcnow()).date()
+        session_day = (session.start_time or utc_now()).date()
         update_streak(current_athlete, session_day)
         check_and_award_achievements(current_athlete, db, session)
 
@@ -243,7 +250,7 @@ async def update_session(
 
 
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_session(
+def delete_session(
     session_id: int,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db)
@@ -271,7 +278,7 @@ async def delete_session(
 
 
 @router.get("/stats/summary")
-async def get_session_stats(
+def get_session_stats(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db)
 ):

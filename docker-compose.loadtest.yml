@@ -1,0 +1,5 @@
+services:
+  backend:
+    image: pocketcoach-check-backend:latest
+    volumes:
+      - ./backend:/app/backend:ro

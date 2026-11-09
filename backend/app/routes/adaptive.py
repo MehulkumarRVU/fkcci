@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/adaptive", tags=["Adaptive Training"])
 
 
 @router.get("/catalog")
-async def get_adaptive_catalog(category: Optional[str] = None) -> Dict[str, Any]:
+def get_adaptive_catalog(category: Optional[str] = None) -> Dict[str, Any]:
     if category and category not in ACTIVE_ADAPTIVE_CATEGORIES:
         raise HTTPException(status_code=400, detail="Invalid training category")
     return {
@@ -32,7 +32,7 @@ async def get_adaptive_catalog(category: Optional[str] = None) -> Dict[str, Any]
 
 
 @router.get("/profile")
-async def get_adaptive_profile(
+def get_adaptive_profile(
     current_athlete: Athlete = Depends(get_current_athlete),
 ) -> Dict[str, Any]:
     return {
@@ -42,7 +42,7 @@ async def get_adaptive_profile(
 
 
 @router.put("/profile")
-async def update_adaptive_profile(
+def update_adaptive_profile(
     profile: AdaptiveProfileInput,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
@@ -58,7 +58,7 @@ async def update_adaptive_profile(
 
 
 @router.delete("/profile", status_code=204)
-async def delete_adaptive_profile(
+def delete_adaptive_profile(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
 ):
@@ -74,12 +74,16 @@ class AdaptiveCapabilityResponse(BaseModel):
 
 
 @router.get("/capabilities", response_model=list[AdaptiveCapabilityResponse])
-async def adaptive_capabilities():
-    return [
-        AdaptiveCapabilityResponse(
+def adaptive_capabilities():
+    capabilities = []
+    for category in sorted(ACTIVE_ADAPTIVE_CATEGORIES):
+        supported = bool(exercise_catalog(category))
+        capabilities.append(AdaptiveCapabilityResponse(
             category=category,
-            adaptive_supported=True,
-            note="Configurable seated/standing references with required-landmark gating; validate with coaches and athletes before sport-specific claims.",
-        )
-        for category in sorted(ACTIVE_ADAPTIVE_CATEGORIES)
-    ]
+            adaptive_supported=supported,
+            note=(
+                "Configurable references with required-landmark gating; validate with coaches and athletes before sport-specific claims."
+                if supported else "No adaptive exercise is currently available for this category."
+            ),
+        ))
+    return capabilities

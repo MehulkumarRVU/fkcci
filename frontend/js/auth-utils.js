@@ -19,40 +19,76 @@ function clearAuthStorage() {
     localStorage.removeItem('refresh_token');
 }
 
+let logoutInProgress = false;
+
+async function logout() {
+    if (logoutInProgress) return;
+    logoutInProgress = true;
+
+    const refreshToken = getRefreshToken();
+    let revocationFailed = false;
+    if (refreshToken) {
+        try {
+            const response = await fetch(`${AUTH_API_URL}/api/auth/logout`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refreshToken })
+            });
+            if (!response.ok) {
+                throw new Error(`Logout token revocation failed (${response.status})`);
+            }
+        } catch (error) {
+            console.error('Could not revoke the server refresh token:', error);
+            revocationFailed = true;
+        }
+    }
+
+    clearAuthStorage();
+    if (revocationFailed) {
+        window.alert('The server could not revoke this session. Its refresh token may remain valid until it expires.');
+    }
+    window.location.href = 'login.html';
+}
+
 function handleUnauthorized() {
     clearAuthStorage();
     window.location.href = 'login.html';
 }
 
+let refreshTokenRequest = null;
+
 async function refreshAccessToken() {
-    const refreshToken = getRefreshToken();
-    if (!refreshToken) {
-        return false;
+    if (refreshTokenRequest) {
+        return refreshTokenRequest;
     }
 
-    try {
-        const response = await fetch(`${AUTH_API_URL}/api/auth/token/refresh`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ refresh_token: refreshToken })
-        });
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) return false;
 
-        if (!response.ok) {
+    refreshTokenRequest = (async () => {
+        try {
+            const response = await fetch(`${AUTH_API_URL}/api/auth/token/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refreshToken })
+            });
+
+            if (!response.ok) return false;
+
+            const data = await response.json();
+            localStorage.setItem('token', data.access_token);
+            if (data.refresh_token) {
+                localStorage.setItem('refresh_token', data.refresh_token);
+            }
+            return true;
+        } catch (err) {
+            console.error('Error refreshing access token:', err);
             return false;
         }
-
-        const data = await response.json();
-        localStorage.setItem('token', data.access_token);
-        if (data.refresh_token) {
-            localStorage.setItem('refresh_token', data.refresh_token);
-        }
-        return true;
-    } catch (err) {
-        console.error('Error refreshing access token:', err);
-        return false;
-    }
+    })().finally(() => {
+        refreshTokenRequest = null;
+    });
+    return refreshTokenRequest;
 }
 
 async function fetchWithAuth(url, options = {}) {
@@ -130,8 +166,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+document.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element)) return;
+    const logoutButton = event.target.closest('#logoutBtn');
+    if (!logoutButton) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    void logout();
+}, true);
+
 window.getAuthToken = getAuthToken;
+window.refreshAccessToken = refreshAccessToken;
 window.fetchWithAuth = fetchWithAuth;
 window.handleUnauthorized = handleUnauthorized;
+window.logout = logout;
 window.requireAuth = requireAuth;
 window.downloadFile = downloadFile;

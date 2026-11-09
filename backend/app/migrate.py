@@ -4,6 +4,12 @@ from .database import engine
 
 
 def apply_migrations():
+    if engine.dialect.name != "sqlite":
+        raise RuntimeError(
+            "The numbered SQL files are legacy SQLite migrations; "
+            "PostgreSQL upgrades use init_database compatibility migrations."
+        )
+
     project_root = Path(__file__).resolve().parents[1]
     migrations_dir = project_root / "migrations"
     migrations = sorted(migrations_dir.glob("*.sql"))

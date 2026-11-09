@@ -8,16 +8,18 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from ..database import get_db
 from ..models.athlete import Athlete
 from ..config import settings
 from ..sports_registry import is_valid_sport, VALID_SPORTS
-from ..services.auth_service import AuthService
+from ..services.auth_service import AuthService, PasswordHashCapacityExceeded
 from ..services.email_service import send_password_reset_email
 from ..adaptive_training import AdaptiveProfileInput
+from ..time_utils import as_utc, utc_now
 
 try:
     import bcrypt
@@ -26,7 +28,6 @@ except ImportError:
 
 # Security Configuration (loaded from environment via settings)
 ALGORITHM = settings.ALGORITHM
-ACCESS_TOKEN_EXPIRE_DAYS = settings.ACCESS_TOKEN_EXPIRE_DAYS
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -52,15 +53,13 @@ class CoachCreate(BaseModel):
 
 
 class CoachResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     email: str
     username: str
     role: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
-
 
 class AthleteResponse(BaseModel):
     id: int
@@ -96,6 +95,10 @@ class AthleteProfileUpdate(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class TokenPair(Token):
+    refresh_token: str
 
 
 class TokenData(BaseModel):
@@ -153,12 +156,38 @@ def get_password_hash(password: str) -> str:
     return auth_service.get_password_hash(password)
 
 
+def _password_hash_overloaded() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Authentication is temporarily busy. Please retry.",
+        headers={"Retry-After": "1"},
+    )
+
+
+async def hash_password_for_request(password: str) -> str:
+    try:
+        return await AuthService(db=None).get_password_hash_async(password)
+    except PasswordHashCapacityExceeded:
+        raise _password_hash_overloaded()
+
+
+async def verify_password_for_request(
+    auth_service: AuthService,
+    plain_password: str,
+    hashed_password: str,
+) -> bool:
+    try:
+        return await auth_service.verify_password_async(plain_password, hashed_password)
+    except PasswordHashCapacityExceeded:
+        raise _password_hash_overloaded()
+
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     auth_service = AuthService(db=None)
     return auth_service.create_access_token(data, expires_delta)
 
 
-async def get_current_athlete(
+def get_current_athlete(
     token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> Athlete:
     credentials_exception = HTTPException(
@@ -178,6 +207,11 @@ async def get_current_athlete(
     athlete = db.query(Athlete).filter(Athlete.username == token_data.username).first()
     if athlete is None:
         raise credentials_exception
+    if not athlete.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive",
+        )
     return athlete
 
 
@@ -189,7 +223,7 @@ def create_refresh_token(db: Session, athlete: Athlete, expires_days: int = 30) 
     token = secrets.token_urlsafe(32)
     # Use HMAC with SECRET_KEY to avoid storing plain SHA256(token) (harder to precompute)
     token_hash = hmac.new(settings.SECRET_KEY.encode(), token.encode(), hashlib.sha256).hexdigest()
-    expires_at = datetime.utcnow() + timedelta(days=expires_days)
+    expires_at = utc_now() + timedelta(days=expires_days)
     rt = RefreshToken(
         athlete_id=athlete.id, token_hash=token_hash, expires_at=expires_at, revoked=False
     )
@@ -204,7 +238,7 @@ def verify_refresh_token(db: Session, token: str) -> Optional[RefreshToken]:
     rt = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash, RefreshToken.revoked == False).first()
     if not rt:
         return None
-    if rt.expires_at < datetime.utcnow():
+    if as_utc(rt.expires_at) < utc_now():
         return None
     return rt
 
@@ -243,12 +277,26 @@ async def signup(athlete_data: AthleteCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid sport_type"
         )
+
+    db.rollback()
+    hashed_password = await hash_password_for_request(athlete_data.password)
+
+    if db.query(Athlete).filter(Athlete.email == athlete_data.email).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    if db.query(Athlete).filter(Athlete.username == athlete_data.username).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken"
+        )
     
     # Create new athlete
     new_athlete = Athlete(
         email=athlete_data.email,
         username=athlete_data.username,
-        hashed_password=get_password_hash(athlete_data.password),
+        hashed_password=hashed_password,
         role="athlete",
         sport_type=athlete_data.sport_type,
         linked_sports=athlete_data.sport_type,
@@ -286,12 +334,26 @@ async def signup_coach(coach_data: CoachCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already taken"
         )
+
+    db.rollback()
+    hashed_password = await hash_password_for_request(coach_data.password)
+
+    if db.query(Athlete).filter(Athlete.email == coach_data.email).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    if db.query(Athlete).filter(Athlete.username == coach_data.username).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already taken"
+        )
     
     # Create new coach
     new_coach = Athlete(
         email=coach_data.email,
         username=coach_data.username,
-        hashed_password=get_password_hash(coach_data.password),
+        hashed_password=hashed_password,
         role="coach",
         sport_type="boxing",  # Default, coaches can manage supported sports
         linked_sports="boxing,table_tennis,badminton"
@@ -311,7 +373,38 @@ async def signup_coach(coach_data: CoachCreate, db: Session = Depends(get_db)):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str = Field(min_length=32, max_length=512)
+
+
+def _exchange_refresh_token(request: RefreshRequest, db: Session) -> dict:
+    auth_service = AuthService(db)
+    rt = auth_service.verify_refresh_token(request.refresh_token)
+    if not rt:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    athlete = db.query(Athlete).filter(Athlete.id == rt.athlete_id).first()
+    if not athlete:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token owner")
+
+    if not athlete.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive")
+
+    new_refresh = auth_service.rotate_refresh_token(request.refresh_token, athlete)
+    if new_refresh is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    access_token = auth_service.create_access_token(data={"sub": athlete.username})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "refresh_token": new_refresh,
+    }
 
 
 @router.post("/login")
@@ -321,58 +414,100 @@ async def login(
 ):
     """Login and get access token"""
     auth_service = AuthService(db)
-    athlete = db.query(Athlete).filter(Athlete.username == form_data.username).first()
-    
-    if not athlete or not auth_service.verify_password(form_data.password, athlete.hashed_password):
+    def load_login_candidate():
+        athlete = db.query(Athlete).filter(Athlete.username == form_data.username).first()
+        if athlete is None:
+            db.rollback()
+            return None
+        candidate = (
+            athlete.id,
+            athlete.username,
+            athlete.hashed_password,
+            athlete.is_active,
+        )
+        db.expunge(athlete)
+        db.rollback()
+        return candidate
+
+    login_candidate = await run_in_threadpool(load_login_candidate)
+    if login_candidate is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    if not athlete.is_active:
+
+    athlete_id, username, hashed_password, is_active = login_candidate
+    password_is_valid = await verify_password_for_request(
+        auth_service,
+        form_data.password,
+        hashed_password,
+    )
+    if not password_is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is inactive"
         )
-    
-    access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    access_token = auth_service.create_access_token(
-        data={"sub": athlete.username}, expires_delta=access_token_expires
-    )
 
-    refresh_token = auth_service.create_refresh_token(athlete)
+    def create_refresh_token_if_password_is_current():
+        current_athlete = (
+            db.query(Athlete)
+            .filter(Athlete.id == athlete_id)
+            .with_for_update()
+            .first()
+        )
+        if current_athlete is None or not hmac.compare_digest(
+            current_athlete.hashed_password,
+            hashed_password,
+        ):
+            db.rollback()
+            return None
+        if not current_athlete.is_active:
+            db.rollback()
+            return None
+        return auth_service.create_refresh_token(current_athlete)
+
+    refresh_token = await run_in_threadpool(
+        create_refresh_token_if_password_is_current
+    )
+    if refresh_token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token = auth_service.create_access_token(
+        data={"sub": username}
+    )
 
     return {"access_token": access_token, "token_type": "bearer", "refresh_token": refresh_token}
 
 
-@router.post("/token/refresh")
-async def refresh_with_token(
+@router.post("/token/refresh", response_model=TokenPair)
+def refresh_with_token(
     request: RefreshRequest, db: Session = Depends(get_db)
 ):
     """Exchange a valid refresh token for a new access token (rotates refresh token)."""
-    auth_service = AuthService(db)
-    rt = auth_service.verify_refresh_token(request.refresh_token)
-    if not rt:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token"
-        )
+    return _exchange_refresh_token(request, db)
 
-    athlete = db.query(Athlete).filter(Athlete.id == rt.athlete_id).first()
-    if not athlete:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token owner")
 
-    auth_service.revoke_refresh_token(request.refresh_token)
-    new_refresh = auth_service.create_refresh_token(athlete)
-
-    access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    access_token = auth_service.create_access_token(data={"sub": athlete.username}, expires_delta=access_token_expires)
-
-    return {"access_token": access_token, "token_type": "bearer", "refresh_token": new_refresh}
+@router.post("/logout")
+def logout(request: RefreshRequest, db: Session = Depends(get_db)):
+    """Revoke the submitted refresh token so it cannot be used again."""
+    AuthService(db).revoke_refresh_token(request.refresh_token)
+    return {"message": "Logged out"}
 
 
 @router.get("/me", response_model=AthleteResponse)
-async def get_current_athlete_info(
+def get_current_athlete_info(
     current_athlete: Athlete = Depends(get_current_athlete)
 ):
     """Get current authenticated athlete's information"""
@@ -380,7 +515,7 @@ async def get_current_athlete_info(
 
 
 @router.put("/profile", response_model=AthleteResponse)
-async def update_profile(
+def update_profile(
     profile_data: AthleteProfileUpdate,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
@@ -431,15 +566,10 @@ async def update_profile(
     return athlete_to_response(current_athlete)
 
 
-@router.post("/refresh", response_model=Token)
-async def refresh_token(current_athlete: Athlete = Depends(get_current_athlete)):
-    """Refresh access token"""
-    access_token_expires = timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    access_token = create_access_token(
-        data={"sub": current_athlete.username}, expires_delta=access_token_expires
-    )
-
-    return {"access_token": access_token, "token_type": "bearer"}
+@router.post("/refresh", response_model=TokenPair)
+def refresh_token(request: RefreshRequest, db: Session = Depends(get_db)):
+    """Compatibility path; use the same rotating refresh-token exchange."""
+    return _exchange_refresh_token(request, db)
 
 
 class PasswordResetRequest(BaseModel):
@@ -455,7 +585,7 @@ _GENERIC_RESET_RESPONSE = {"message": "If that email is registered, password res
 
 
 @router.post("/password-reset/request")
-async def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(get_db)):
+def request_password_reset(payload: PasswordResetRequest, db: Session = Depends(get_db)):
     """Always returns the same generic response regardless of whether the
     email is registered, to prevent account enumeration. Covered by the
     global IP-based RateLimitMiddleware already applied to every route."""
@@ -488,12 +618,17 @@ async def confirm_password_reset(payload: PasswordResetConfirm, db: Session = De
     if len(payload.new_password) < 6:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password must be at least 6 characters")
 
-    athlete = db.query(Athlete).filter(Athlete.id == prt.athlete_id).first()
+    athlete_id = prt.athlete_id
+    db.rollback()
+    hashed_password = await hash_password_for_request(payload.new_password)
+
+    athlete = db.query(Athlete).filter(Athlete.id == athlete_id).first()
     if not athlete:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
 
-    athlete.hashed_password = get_password_hash(payload.new_password)
-    auth_service.consume_password_reset_token(payload.token)
+    athlete.hashed_password = hashed_password
+    if not auth_service.consume_password_reset_token(payload.token):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
 
     # Force re-login everywhere - standard practice after a password change.
     db.query(RefreshToken).filter(RefreshToken.athlete_id == athlete.id, RefreshToken.revoked == False).update(

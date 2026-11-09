@@ -1,48 +1,153 @@
-version: '3.9'
 services:
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    ports:
-      - "8080:8080"
     env_file:
       - .env
-    volumes:
-      - ./backend:/app/backend
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg2://pocketcoach:pocketcoach@postgres:5432/pocketcoach
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
+      ENV: ${ENV:-development}
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:?Set POSTGRES_USER}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
-    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-60}
+      RATE_LIMIT_WINDOW_SECONDS: ${RATE_LIMIT_WINDOW_SECONDS:-60}
+      REDIS_CONNECT_TIMEOUT_SECONDS: ${REDIS_CONNECT_TIMEOUT_SECONDS:-1}
+      REDIS_RETRY_INTERVAL_SECONDS: ${REDIS_RETRY_INTERVAL_SECONDS:-5}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/ready', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
 
   redis:
     image: redis:8-alpine
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
 
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: pocketcoach
-      POSTGRES_PASSWORD: pocketcoach
-      POSTGRES_DB: pocketcoach
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
 
   nginx:
     image: nginx:stable-alpine
     ports:
-      - "80:80"
+      - "${NGINX_PORT_MAPPING:-80:80}"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./frontend:/usr/share/nginx/html:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  postgres-maintenance:
+    image: postgres:16-alpine
+    profiles: ["maintenance"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      BACKUP_DIRECTORY: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_FAILURE_WEBHOOK_URL: ${BACKUP_FAILURE_WEBHOOK_URL:-}
+    volumes:
+      - ${BACKUP_STORAGE_PATH:-./backups}:/backups
+      - ./scripts/backup_postgres.sh:/scripts/backup_postgres.sh:ro
+      - ./scripts/restore_postgres.sh:/scripts/restore_postgres.sh:ro
+    entrypoint: ["/bin/sh"]
+
+  postgres-backup:
+    image: postgres:16-alpine
+    profiles: ["backup"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:?Set POSTGRES_DB}
+      BACKUP_DIRECTORY: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_FAILURE_WEBHOOK_URL: ${BACKUP_FAILURE_WEBHOOK_URL:-}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ${BACKUP_STORAGE_PATH:-./backups}:/backups
+      - ./scripts/backup_postgres.sh:/scripts/backup_postgres.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        case "$${BACKUP_INTERVAL_SECONDS}" in
+          ''|*[!0-9]*) echo '{"level":"error","event":"invalid_backup_interval"}'; exit 2 ;;
+        esac
+        if [ "$${BACKUP_INTERVAL_SECONDS}" -lt 60 ]; then
+          echo '{"level":"error","event":"backup_interval_too_short"}'
+          exit 2
+        fi
+        while :; do
+          if /scripts/backup_postgres.sh; then
+            echo '{"level":"info","event":"scheduled_backup_cycle_complete"}'
+          else
+            echo '{"level":"error","event":"scheduled_backup_cycle_failed"}'
+          fi
+          sleep "$${BACKUP_INTERVAL_SECONDS}"
+        done
+    restart: unless-stopped
 
 volumes:
   postgres_data:

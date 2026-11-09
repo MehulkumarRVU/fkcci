@@ -86,9 +86,11 @@ Adaptive catalog routes:
 
 Signup and profile integration:
 
-- Signup offers Standard Training or Adaptive Training and stores only the
-  selected setup/preferences; no diagnosis or disability disclosure is
-  required.
+- Signup offers Standard Training or Adaptive Training. Athletes can save a
+  preferred setup, category-supported exercise focus, camera orientation,
+  training goals, equipment notes, and accessibility preferences; no diagnosis
+  or disability disclosure is required. The same settings can be reviewed and
+  edited later from the profile page.
 - Profile settings can be enabled, disabled without deleting them, cancelled,
   reloaded after login, or explicitly removed.
 - If a later profile save fails, the account remains usable and standard
@@ -98,9 +100,9 @@ Signup and profile integration:
 Verification:
 
 ```powershell
-& 'C:\Users\isha1\AppData\Local\Programs\Python\Python312\python.exe' -m pytest backend/tests
-& 'C:\Users\isha1\AppData\Local\Programs\Python\Python312\python.exe' -m compileall -q backend
-& 'C:\Users\isha1\AppData\Local\Programs\Python\Python312\python.exe' -m pip check
+python -m pytest backend/tests
+python -m compileall -q backend
+python -m pip check
 ```
 
 Frontend JavaScript syntax was verified with Node.js 26.13.0:
@@ -149,8 +151,8 @@ to sport.
    ```bash
    docker compose up --build
    ```
-3. Backend API is available at `http://localhost:8080`.
-4. Nginx serves the frontend and reverse-proxies `/api` at `http://localhost`.
+3. Nginx serves the frontend and reverse-proxies `/api` at `http://localhost`.
+   The backend is internal to the Compose network and is not published directly.
 
 ### Environment variables
 - `DATABASE_URL` can point to PostgreSQL using `postgresql+psycopg2://user:password@host:port/dbname`
@@ -181,15 +183,32 @@ is hosted at a separate public origin.
   device test harness. Android Chrome, iPhone/iPad Safari, and camera behavior
   on real hardware remain manual release-gate checks.
 
+### Current operational reports
+
+- [Testing and runtime checks](./TESTING_REPORT.md)
+- [Security review](./SECURITY_AUDIT.md)
+- [Deployment validation report](./DEPLOYMENT_REPORT.md)
+- [Performance and model evaluation](./PERFORMANCE_REPORT.md)
+- [Production readiness checklist](./PRODUCTION_READINESS_CHECKLIST.md)
+- [PostgreSQL migration report](./POSTGRESQL_MIGRATION_REPORT.md)
+- [Database backup and restore report](./DATABASE_BACKUP_RESTORE_REPORT.md)
+- [Production configuration report](./PRODUCTION_CONFIGURATION_REPORT.md)
+- [Monitoring and alerting report](./MONITORING_AND_ALERTING_REPORT.md)
+- [Independent security review package](./INDEPENDENT_SECURITY_REVIEW_PACKAGE.md)
+- [Authenticated load test report](./AUTHENTICATED_LOAD_TEST_REPORT.md)
+- [Physical device validation report](./PHYSICAL_DEVICE_VALIDATION_REPORT.md)
+- [Controlled athlete pilot plan](./CONTROLLED_ATHLETE_PILOT_PLAN.md)
+- [Dataset/model evaluation details](./dataset/MODEL_ACCURACY_AUDIT.md)
+
 ---
 
 ## 🏗️ Architecture
 
 ### Backend (FastAPI + Python)
-- **Port:** 8080
+- **Port:** 8080 in local Python development; internal-only in Docker Compose
 - **Framework:** FastAPI
 - **Database:** SQLite with SQLAlchemy ORM
-- **Authentication:** JWT tokens (7-day expiry)
+- **Authentication:** 15-minute JWT access tokens with rotating refresh tokens
 - **AI Analysis:** MediaPipe pose detection integration
 
 ### Frontend (HTML5/CSS3/JavaScript)

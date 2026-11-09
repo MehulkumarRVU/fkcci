@@ -3,7 +3,7 @@ from typing import List, Optional
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -11,6 +11,7 @@ from ..models.athlete import Athlete
 from ..models.coach_connection_request import CoachConnectionRequest
 from ..models.coach_invite import CoachInvite
 from .auth import get_current_athlete
+from ..time_utils import utc_now
 
 router = APIRouter(prefix="/api/coaches", tags=["Coaches"])
 
@@ -21,23 +22,21 @@ def _require_role(athlete: Athlete, role: str) -> None:
 
 
 class CoachSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     username: str
 
-    class Config:
-        from_attributes = True
-
-
 class AthleteSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     username: str
     sport_type: str
 
-    class Config:
-        from_attributes = True
-
-
 class ConnectionRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     athlete_id: int
     coach_id: int
@@ -46,10 +45,6 @@ class ConnectionRequestOut(BaseModel):
     responded_at: Optional[datetime] = None
     athlete: Optional[AthleteSummary] = None
     coach: Optional[CoachSummary] = None
-
-    class Config:
-        from_attributes = True
-
 
 class ConnectionStatusOut(BaseModel):
     connected_coach: Optional[CoachSummary] = None
@@ -62,7 +57,7 @@ class InviteCodeOut(BaseModel):
 
 
 @router.get("/search", response_model=List[CoachSummary])
-async def search_coaches(
+def search_coaches(
     q: str = "",
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
@@ -77,7 +72,7 @@ async def search_coaches(
 
 
 @router.post("/{coach_id}/request", response_model=ConnectionRequestOut, status_code=status.HTTP_201_CREATED)
-async def request_coach(
+def request_coach(
     coach_id: int,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
@@ -106,7 +101,7 @@ async def request_coach(
 
 
 @router.get("/me/requests", response_model=List[ConnectionRequestOut])
-async def list_pending_requests(
+def list_pending_requests(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
 ):
@@ -141,7 +136,7 @@ def _get_own_request_as_coach(request_id: int, current_athlete: Athlete, db: Ses
 
 
 @router.post("/requests/{request_id}/accept", response_model=ConnectionRequestOut)
-async def accept_request(
+def accept_request(
     request_id: int,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
@@ -156,7 +151,7 @@ async def accept_request(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Athlete already has a coach")
 
     req.status = "accepted"
-    req.responded_at = datetime.utcnow()
+    req.responded_at = utc_now()
     athlete.coach_id = current_athlete.id
     db.commit()
     db.refresh(req)
@@ -164,7 +159,7 @@ async def accept_request(
 
 
 @router.post("/requests/{request_id}/reject", response_model=ConnectionRequestOut)
-async def reject_request(
+def reject_request(
     request_id: int,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
@@ -173,14 +168,14 @@ async def reject_request(
     req = _get_own_request_as_coach(request_id, current_athlete, db)
 
     req.status = "rejected"
-    req.responded_at = datetime.utcnow()
+    req.responded_at = utc_now()
     db.commit()
     db.refresh(req)
     return req
 
 
 @router.delete("/requests/{request_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def cancel_request(
+def cancel_request(
     request_id: int,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
@@ -198,7 +193,7 @@ async def cancel_request(
 
 
 @router.post("/me/invite-code", response_model=InviteCodeOut)
-async def generate_invite_code(
+def generate_invite_code(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
 ):
@@ -217,7 +212,7 @@ async def generate_invite_code(
 
 
 @router.get("/me/invite-code", response_model=Optional[InviteCodeOut])
-async def get_invite_code(
+def get_invite_code(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
 ):
@@ -232,7 +227,7 @@ async def get_invite_code(
 
 
 @router.post("/join/{code}", response_model=CoachSummary)
-async def join_with_code(
+def join_with_code(
     code: str,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
@@ -256,7 +251,7 @@ async def join_with_code(
 
 
 @router.delete("/me/athletes/{athlete_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def disconnect_athlete(
+def disconnect_athlete(
     athlete_id: int,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
@@ -272,7 +267,7 @@ async def disconnect_athlete(
 
 
 @router.post("/me/leave", status_code=status.HTTP_204_NO_CONTENT)
-async def leave_coach(
+def leave_coach(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
 ):
@@ -286,7 +281,7 @@ async def leave_coach(
 
 
 @router.get("/me/connection-status", response_model=ConnectionStatusOut)
-async def connection_status(
+def connection_status(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db),
 ):

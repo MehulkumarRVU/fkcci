@@ -1,0 +1,8 @@
+services:
+  nginx:
+    ports:
+      - "${NGINX_PORT_MAPPING:-80:80}"
+      - "${NGINX_TLS_PORT_MAPPING:-443:443}"
+    volumes:
+      - ./nginx.tls.conf:/etc/nginx/nginx.conf:ro
+      - ${TLS_CERTIFICATE_PATH:?Set TLS_CERTIFICATE_PATH}:/etc/nginx/certs:ro

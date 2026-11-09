@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
-from datetime import datetime
 from ..database import Base
+from ..time_utils import utc_now
 
 
 class CoachInvite(Base):
@@ -12,5 +12,5 @@ class CoachInvite(Base):
     id = Column(Integer, primary_key=True, index=True)
     coach_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
     code = Column(String, unique=True, index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
     revoked = Column(Boolean, default=False)

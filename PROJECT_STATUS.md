@@ -167,7 +167,7 @@ boxing/
 ### User Authentication
 - ✅ Email verification
 - ✅ Secure password hashing
-- ✅ JWT token system (7-day expiry)
+- ✅ JWT access tokens (15-minute expiry), rotating refresh tokens, and logout revocation
 - ✅ Token refresh capability
 
 ### Training Session Management

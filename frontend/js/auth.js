@@ -58,7 +58,58 @@ document.addEventListener('change', (event) => {
     }
     const adaptive = event.target.value === 'adaptive';
     document.getElementById('signupAdaptiveOptions')?.classList.toggle('hidden', !adaptive);
+    if (adaptive) {
+        loadSignupAdaptiveExercises();
+    }
 });
+
+const signupSportType = document.getElementById('sportType');
+signupSportType?.addEventListener('change', () => {
+    if (document.querySelector('input[name="signupTrainingMode"]:checked')?.value === 'adaptive') {
+        loadSignupAdaptiveExercises();
+    }
+});
+
+document.getElementById('signupAdaptiveSetup')?.addEventListener('change', () => {
+    loadSignupAdaptiveExercises();
+});
+
+async function loadSignupAdaptiveExercises() {
+    const category = document.getElementById('sportType')?.value;
+    const setup = document.getElementById('signupAdaptiveSetup')?.value;
+    const exerciseSelect = document.getElementById('signupAdaptiveExercise');
+    if (!exerciseSelect) return;
+
+    exerciseSelect.replaceChildren(new Option('Loading adaptive exercises...', ''));
+    if (!category) {
+        exerciseSelect.replaceChildren(new Option('Choose a training category first', ''));
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/adaptive/catalog?category=${encodeURIComponent(category)}`);
+        if (!response.ok) {
+            throw new Error('Adaptive exercises could not be loaded.');
+        }
+
+        const catalog = await response.json();
+        const exercises = Object.entries(catalog.exercises || {})
+            .filter(([, details]) => details.setups.includes(setup));
+        exerciseSelect.replaceChildren(
+            new Option(
+                exercises.length ? 'Select an adaptive exercise' : 'No adaptive exercises match this category and setup',
+                ''
+            )
+        );
+        for (const [exercise, details] of exercises) {
+            const label = exercise.replaceAll('_', ' ').replace(/\b\w/g, character => character.toUpperCase());
+            exerciseSelect.add(new Option(label, exercise));
+        }
+    } catch (error) {
+        exerciseSelect.replaceChildren(new Option('Adaptive exercises could not be loaded. Please try again.', ''));
+        showAlert(error.message, 'error');
+    }
+}
 
 // Login Form Handler
 const loginFormElement = document.getElementById('loginFormElement');
@@ -149,7 +200,6 @@ if (signupFormElement) {
                 accountType,
                 email,
                 username,
-                password,
                 sportType: document.getElementById('sportType').value,
                 skillLevel: document.getElementById('skillLevel').value,
                 dominantHand: document.getElementById('dominantHand').value,
@@ -178,6 +228,18 @@ if (signupFormElement) {
                 const height = document.getElementById('height').value;
                 const weight = document.getElementById('weight').value;
                 const adaptiveEnabled = document.querySelector('input[name="signupTrainingMode"]:checked')?.value === 'adaptive';
+                const adaptiveProfile = adaptiveEnabled ? {
+                    enabled: true,
+                    preferred_setup: document.getElementById('signupAdaptiveSetup').value,
+                    exercise_adaptations: [document.getElementById('signupAdaptiveExercise').value].filter(Boolean),
+                    camera_view: document.getElementById('signupAdaptiveCamera').value || null,
+                    training_goals: Array.from(document.getElementById('signupAdaptiveGoals').selectedOptions)
+                        .map(option => option.value),
+                    equipment: document.getElementById('signupAdaptiveEquipment').value
+                        .split(',').map(value => value.trim()).filter(Boolean),
+                    accessibility_preferences: document.getElementById('signupAdaptivePreferences').value
+                        .split(',').map(value => value.trim()).filter(Boolean)
+                } : null;
 
                 response = await fetch(`${API_URL}/api/auth/signup`, {
                     method: 'POST',
@@ -193,12 +255,7 @@ if (signupFormElement) {
                         dominant_hand: dominantHand,
                         height: height ? parseFloat(height) : null,
                         weight: weight ? parseFloat(weight) : null,
-                        adaptive_profile: adaptiveEnabled ? {
-                            enabled: true,
-                            preferred_setup: document.getElementById('signupAdaptiveSetup').value,
-                            accessibility_preferences: document.getElementById('signupAdaptivePreferences').value
-                                .split(',').map(value => value.trim()).filter(Boolean)
-                        } : null
+                        adaptive_profile: adaptiveProfile
                     })
                 });
             }
@@ -248,35 +305,42 @@ function showAlert(message, type = 'info') {
     }, 5000);
 }
 
+let authPageRefreshTokenRequest = null;
+
 async function refreshAccessToken() {
+    if (authPageRefreshTokenRequest) {
+        return authPageRefreshTokenRequest;
+    }
+
     const refreshToken = localStorage.getItem('refresh_token');
     if (!refreshToken) {
         return false;
     }
 
-    try {
-        const response = await fetch(`${API_URL}/api/auth/token/refresh`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ refresh_token: refreshToken })
-        });
+    authPageRefreshTokenRequest = (async () => {
+        try {
+            const response = await fetch(`${API_URL}/api/auth/token/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refreshToken })
+            });
 
-        if (!response.ok) {
+            if (!response.ok) return false;
+
+            const data = await response.json();
+            localStorage.setItem('token', data.access_token);
+            if (data.refresh_token) {
+                localStorage.setItem('refresh_token', data.refresh_token);
+            }
+            return true;
+        } catch (error) {
+            console.error('Error refreshing access token:', error);
             return false;
         }
-
-        const data = await response.json();
-        localStorage.setItem('token', data.access_token);
-        if (data.refresh_token) {
-            localStorage.setItem('refresh_token', data.refresh_token);
-        }
-        return true;
-    } catch (error) {
-        console.error('Error refreshing access token:', error);
-        return false;
-    }
+    })().finally(() => {
+        authPageRefreshTokenRequest = null;
+    });
+    return authPageRefreshTokenRequest;
 }
 
 async function fetchWithAuth(url, options = {}) {

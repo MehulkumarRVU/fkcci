@@ -158,7 +158,7 @@ async function loadProfile() {
     }
 }
 
-async function loadAdaptiveProfile() {
+async function loadAdaptiveProfile(athlete) {
     const enabled = document.getElementById('adaptiveEnabled');
     const options = document.getElementById('profileAdaptiveOptions');
     if (!enabled || !options) return;
@@ -170,8 +170,15 @@ async function loadAdaptiveProfile() {
         options.classList.toggle('hidden', !enabled.checked);
         const profile = data.profile || {};
         if (profile.preferred_setup) document.getElementById('adaptiveSetup').value = profile.preferred_setup;
+        document.getElementById('adaptiveCamera').value = profile.camera_view || '';
+        document.getElementById('adaptiveEquipment').value = (profile.equipment || []).join(', ');
         document.getElementById('adaptivePreferences').value =
             (profile.accessibility_preferences || []).join(', ');
+        const adaptiveGoals = new Set(profile.training_goals || []);
+        Array.from(document.getElementById('adaptiveGoals').options).forEach(option => {
+            option.selected = adaptiveGoals.has(option.value);
+        });
+        await loadAdaptiveExercises(athlete?.sport_type, profile.preferred_setup || 'standing', profile.exercise_adaptations || []);
         const capabilities = await fetchWithAuth(`${API_URL}/api/adaptive/capabilities`);
         if (capabilities.ok) {
             const values = await capabilities.json();
@@ -184,12 +191,48 @@ async function loadAdaptiveProfile() {
     }
 }
 
+async function loadAdaptiveExercises(category, setup, selectedExercises = []) {
+    const exerciseSelect = document.getElementById('adaptiveExercise');
+    if (!exerciseSelect) return;
+    exerciseSelect.replaceChildren(new Option('Loading adaptive exercises...', ''));
+
+    if (!category) {
+        exerciseSelect.replaceChildren(new Option('No exercise selected', ''));
+        return;
+    }
+
+    const response = await fetch(`${API_URL}/api/adaptive/catalog?category=${encodeURIComponent(category)}`);
+    if (!response.ok) {
+        throw new Error('Adaptive exercises could not be loaded.');
+    }
+
+    const catalog = await response.json();
+    const exercises = Object.entries(catalog.exercises || {})
+        .filter(([, details]) => details.setups.includes(setup));
+    exerciseSelect.replaceChildren(new Option('No exercise selected', ''));
+    for (const [exercise, details] of exercises) {
+        const label = exercise.replaceAll('_', ' ').replace(/\b\w/g, character => character.toUpperCase());
+        exerciseSelect.add(new Option(label, exercise));
+    }
+    exerciseSelect.value = selectedExercises.find(exercise => exercises.some(([key]) => key === exercise)) || '';
+}
+
 const adaptiveEnabled = document.getElementById('adaptiveEnabled');
 if (adaptiveEnabled) {
     adaptiveEnabled.addEventListener('change', () => {
         document.getElementById('profileAdaptiveOptions').classList.toggle('hidden', !adaptiveEnabled.checked);
     });
 }
+
+document.getElementById('adaptiveSetup')?.addEventListener('change', async (event) => {
+    const athlete = JSON.parse(localStorage.getItem('athlete') || '{}');
+    try {
+        await loadAdaptiveExercises(athlete.sport_type, event.target.value);
+    } catch (error) {
+        console.error('Error loading adaptive exercises:', error);
+        showAlert('Adaptive exercises could not be loaded. Standard training remains available.', 'error');
+    }
+});
 
 const adaptiveProfileForm = document.getElementById('adaptiveProfileForm');
 if (adaptiveProfileForm) {
@@ -200,6 +243,12 @@ if (adaptiveProfileForm) {
             body: JSON.stringify({
                 enabled: document.getElementById('adaptiveEnabled').checked,
                 preferred_setup: document.getElementById('adaptiveSetup').value,
+                exercise_adaptations: [document.getElementById('adaptiveExercise').value].filter(Boolean),
+                camera_view: document.getElementById('adaptiveCamera').value || null,
+                training_goals: Array.from(document.getElementById('adaptiveGoals').selectedOptions)
+                    .map(option => option.value),
+                equipment: document.getElementById('adaptiveEquipment').value
+                    .split(',').map(value => value.trim()).filter(Boolean),
                 accessibility_preferences: document.getElementById('adaptivePreferences').value
                     .split(',').map(value => value.trim()).filter(Boolean)
             })

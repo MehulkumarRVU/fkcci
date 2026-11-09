@@ -17,19 +17,26 @@ class Settings(BaseSettings):
         description="Secret key for signing tokens. Must be changed in production.",
     )
     ALGORITHM: str = Field("HS256")
-    ACCESS_TOKEN_EXPIRE_DAYS: int = Field(7)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(15, gt=0, le=15)
+    # Accept legacy .env files, but do not use this insecurely long lifetime.
+    ACCESS_TOKEN_EXPIRE_DAYS: Optional[int] = Field(None, gt=0)
     DATABASE_URL: str = Field("sqlite:///./db.sqlite3")
+    POSTGRES_USER: Optional[str] = Field(None)
+    POSTGRES_PASSWORD: Optional[str] = Field(None)
+    POSTGRES_DB: Optional[str] = Field(None)
 
     # Rate limiting
     RATE_LIMIT_REQUESTS: int = Field(60)
     RATE_LIMIT_WINDOW_SECONDS: int = Field(60)
+    RATE_LIMIT_KEY_PREFIX: str = Field("pocketcoach:rl")
     REDIS_URL: Optional[str] = Field("redis://redis:6379/0")
+    REDIS_CONNECT_TIMEOUT_SECONDS: float = Field(1.0, gt=0)
+    REDIS_RETRY_INTERVAL_SECONDS: float = Field(5.0, gt=0)
     CORS_ALLOWED_ORIGINS: List[str] = Field(default_factory=lambda: ["*"])
     ENV: str = Field("development")
 
-    # Password reset email delivery. If SMTP_HOST is unset, reset links are
-    # logged server-side instead of emailed - lets password reset be tested
-    # locally before real SMTP credentials are configured.
+    # Password reset delivery is disabled when SMTP is not configured; reset
+    # links and recipient addresses are never written to application logs.
     SMTP_HOST: Optional[str] = Field(None)
     SMTP_PORT: int = Field(587)
     SMTP_USERNAME: Optional[str] = Field(None)
@@ -66,3 +73,8 @@ def validate_production_security(config: Settings) -> None:
 
     if "*" in config.CORS_ALLOWED_ORIGINS:
         raise RuntimeError("Production requires explicit CORS_ALLOWED_ORIGINS; wildcard CORS is not allowed.")
+
+    if not config.SMTP_HOST or not config.SMTP_FROM_EMAIL:
+        raise RuntimeError(
+            "Production requires SMTP_HOST and SMTP_FROM_EMAIL for password-reset delivery."
+        )

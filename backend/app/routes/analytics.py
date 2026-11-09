@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -10,12 +10,13 @@ from ..models.session import Session as SessionModel
 from ..models.athlete import Athlete
 from ..services.profile_twin_service import get_athlete_twin
 from .auth import get_current_athlete
+from ..time_utils import as_utc, utc_now
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 
 
 @router.get("/me/profile-twin")
-async def get_my_profile_twin(
+def get_my_profile_twin(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db)
 ):
@@ -27,6 +28,8 @@ async def get_my_profile_twin(
 
 # Pydantic Models
 class SessionSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     athlete_username: str
     sport_type: str
@@ -39,10 +42,6 @@ class SessionSummary(BaseModel):
     technique_accuracy: float
     reaction_score: Optional[float] = None
     balance_score: float
-
-    class Config:
-        from_attributes = True
-
 
 class MonthlyStats(BaseModel):
     athlete_id: int
@@ -73,7 +72,7 @@ class AthleteReport(BaseModel):
 
 # Routes
 @router.get("/coach/athletes", response_model=List[dict])
-async def get_coach_athletes(
+def get_coach_athletes(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db)
 ):
@@ -133,8 +132,8 @@ def build_athlete_monthly_report(athlete_id: int, current_athlete: Athlete, db: 
     ).order_by(SessionModel.created_at.desc()).all()
 
     # Filter sessions from past 30 days
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    recent_sessions = [s for s in all_sessions if s.created_at >= thirty_days_ago]
+    thirty_days_ago = utc_now() - timedelta(days=30)
+    recent_sessions = [s for s in all_sessions if as_utc(s.created_at) >= thirty_days_ago]
 
     # Calculate monthly statistics
     completed_sessions = [s for s in recent_sessions if s.is_completed]
@@ -204,7 +203,7 @@ def build_athlete_monthly_report(athlete_id: int, current_athlete: Athlete, db: 
 
 
 @router.get("/coach/athlete/{athlete_id}/monthly-report", response_model=AthleteReport)
-async def get_athlete_monthly_report(
+def get_athlete_monthly_report(
     athlete_id: int,
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db)
@@ -214,7 +213,7 @@ async def get_athlete_monthly_report(
 
 
 @router.get("/coach/summary")
-async def get_coach_summary(
+def get_coach_summary(
     current_athlete: Athlete = Depends(get_current_athlete),
     db: Session = Depends(get_db)
 ):
@@ -241,7 +240,7 @@ async def get_coach_summary(
             "top_performers": []
         }
 
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    thirty_days_ago = utc_now() - timedelta(days=30)
     
     # Get statistics for all athletes
     monthly_sessions = db.query(SessionModel).filter(

@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from datetime import datetime
 from ..database import Base
+from ..time_utils import utc_now
 
 
 class AthleteAchievement(Base):
@@ -14,4 +14,4 @@ class AthleteAchievement(Base):
     id = Column(Integer, primary_key=True, index=True)
     athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
     code = Column(String, nullable=False)
-    earned_at = Column(DateTime, default=datetime.utcnow)
+    earned_at = Column(DateTime(timezone=True), default=utc_now)
